@@ -249,22 +249,65 @@
   const btnSignup  = document.getElementById("btn-signup");
   const btnGoogle  = document.getElementById("btn-google");
 
-  async function loadSignupFlags() {
+  const LOCAL_AUTH_FLAG_DEFAULTS = {
+    enable_google_oauth: true
+  };
+
+  function isLocalDevBuild() {
+    return ["localhost", "127.0.0.1"].includes(window.location.hostname)
+      || window.location.protocol === "file:";
+  }
+
+  async function isAppDevMode() {
+    try {
+      const info = await r.appInfo?.();
+      return !!info?.isDev || !!info?.devBypass;
+    } catch {
+      return false;
+    }
+  }
+
+  async function resolveGoogleOAuthFlag() {
+    const devMode = isLocalDevBuild() || await isAppDevMode();
+
     try {
       const res = await fetch("http://localhost:3000/api/config", { cache: "no-store" });
       if (!res.ok) throw new Error("config unavailable");
       const data = await res.json();
-      return data.feature_flags || {};
+      const backendValue = data.feature_flags?.enable_google_oauth;
+
+      if (backendValue === true) {
+        console.log("[FLAGS] enable_google_oauth = true, source = backend");
+        return { enabled: true, source: "backend", explicitlyDisabled: false };
+      }
+
+      if (backendValue === false && !devMode) {
+        console.log("[FLAGS] enable_google_oauth = false, source = backend");
+        return { enabled: false, source: "backend", explicitlyDisabled: true };
+      }
     } catch {
-      return {};
+      // Fall through to local/dev default while admin flags are being wired.
     }
+
+    console.log(`[FLAGS] enable_google_oauth = ${LOCAL_AUTH_FLAG_DEFAULTS.enable_google_oauth}, source = dev-default`);
+    return {
+      enabled: LOCAL_AUTH_FLAG_DEFAULTS.enable_google_oauth,
+      source: "dev-default",
+      explicitlyDisabled: false
+    };
   }
 
-  loadSignupFlags().then((flags) => {
-    if (flags.enable_google_oauth !== true) {
-      btnGoogle.style.display = "none";
-      document.querySelector(".divider")?.remove();
+  resolveGoogleOAuthFlag().then((flag) => {
+    btnGoogle.style.display = "";
+    if (flag.enabled) {
+      btnGoogle.disabled = false;
+      btnGoogle.title = "Continue with Google";
+      return;
     }
+
+    btnGoogle.disabled = true;
+    btnGoogle.title = "Disabled by backend feature flag";
+    btnGoogle.textContent = "Google sign-in temporarily unavailable";
   });
 
   function showMsg(text, type) { msgEl.textContent = text; msgEl.className = `msg ${type}`; }
@@ -312,6 +355,7 @@
 
   // ── Google OAuth ─────────────────────────────────────────────────
   btnGoogle.addEventListener("click", async () => {
+    if (btnGoogle.disabled) return;
     clearMsg();
     setBusy(btnGoogle, true, "Opening Google…");
     const result = await r.googleAuth();
