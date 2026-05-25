@@ -39,7 +39,7 @@
   "build": {
     "appId": "ai.tzurah.loqii",
     "productName": "Loqii",
-    "copyright": "Copyright © 2025 Tzurah",
+    "copyright": "Copyright (c) 2025 Tzurah",
     "protocols": [
       {
         "name": "Loqii",
@@ -56,6 +56,16 @@
       "supabase.js",
       "build.js",
       "sdk-entry.js",
+      "sessionState.js",
+      "sessionIndicators.js",
+      "statusBanner.js",
+      "promptComposer.js",
+      "scenes.js",
+      "styles.js",
+      "performanceMonitor.js",
+      "errorBoundary.js",
+      "reconnectManager.js",
+      "settingsArchitecture.js",
       "index.html",
       "obs.html",
       "login.html",

@@ -39,4 +39,4 @@ await esbuild.build({
   logLevel: "info",
 });
 
-console.log("✓  public/sdk-bundle.js ready");
+console.log("OK public/sdk-bundle.js ready");

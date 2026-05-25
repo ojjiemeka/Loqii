@@ -415,6 +415,39 @@
       border: 1px solid var(--border); border-radius: 6px; cursor: pointer; z-index: 100;
     }
 
+    .status-stack {
+      position: fixed;
+      top: 58px;
+      right: 14px;
+      z-index: 9200;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      width: min(280px, calc(100vw - 28px));
+      pointer-events: none;
+    }
+    .status-pill {
+      pointer-events: auto;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bar);
+      color: var(--text);
+      box-shadow: 0 12px 26px var(--shadow);
+      font-size: 0.74rem;
+      font-weight: 700;
+      animation: statusIn .16s ease-out;
+    }
+    .status-pill.leaving { opacity: 0; transform: translateY(-4px); transition: opacity .16s, transform .16s; }
+    .status-info { border-color: rgba(96,109,93,.34); }
+    .status-success { border-color: rgba(63,108,81,.45); box-shadow: 0 12px 26px var(--shadow), 0 0 16px rgba(63,108,81,.12); }
+    .status-warning { border-color: rgba(201,112,100,.42); color: var(--loqii-coral); }
+    .status-error { border-color: rgba(201,112,100,.58); color: var(--loqii-coral); }
+    @keyframes statusIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     /*  Card base  */
     .card {
       background: var(--panel-gradient); border: 1px solid var(--border);
@@ -691,6 +724,50 @@
       justify-content: space-between;
       gap: 8px;
     }
+    .scene-toolbar {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+    }
+    .scene-search {
+      min-width: 0;
+      height: 28px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--field);
+      color: var(--text);
+      padding: 0 8px;
+      font: inherit;
+      font-size: 0.68rem;
+      outline: none;
+    }
+    .scene-filter-row {
+      flex: 0 0 auto;
+      display: flex;
+      gap: 5px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .scene-filter-btn {
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--field);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+      padding: 4px 8px;
+    }
+    .scene-filter-btn.active,
+    .scene-filter-btn:hover {
+      color: var(--text);
+      border-color: rgba(63,108,81,.48);
+      background: rgba(63,108,81,.13);
+    }
     .scene-title {
       display: block;
       font-size: 0.62rem;
@@ -731,6 +808,18 @@
       padding: 6px 7px;
       font-family: inherit;
       transition: border-color .15s, background .15s, transform .15s;
+      position: relative;
+    }
+    .scene-card::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 7px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--scene-color, var(--loqii-green));
+      box-shadow: 0 0 8px var(--scene-color, var(--loqii-green));
     }
     .scene-card:hover {
       border-color: rgba(63,108,81,.55);
@@ -748,6 +837,7 @@
       font-weight: 700;
       line-height: 1.25;
       margin-bottom: 2px;
+      padding-left: 9px;
     }
     .scene-card-meta {
       display: block;
@@ -815,6 +905,57 @@
       border-color: var(--accent);
       background: rgba(63,108,81,.12);
       box-shadow: 0 0 12px rgba(63,108,81,.10);
+    }
+    .mode-preset-btn.active {
+      border-color: rgba(63,108,81,.55);
+      background: rgba(63,108,81,.16);
+      color: var(--text);
+    }
+    .perf-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      min-height: 0;
+    }
+    .perf-pill {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--field);
+      padding: 6px 7px;
+      min-width: 0;
+    }
+    .perf-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.56rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .perf-value {
+      display: block;
+      color: var(--text);
+      font-size: 0.74rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .prompt-debug {
+      min-height: 46px;
+      max-height: 86px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--console-bg);
+      color: var(--muted);
+      padding: 6px 7px;
+      font-family: "Consolas", "Cascadia Code", "Monaco", "Courier New", monospace;
+      font-size: 0.61rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
     }
 
     .actions, .action-bar {
@@ -1523,6 +1664,11 @@
               <span id="scene-state" class="scene-state">No scene selected</span>
             </div>
           </div>
+          <div class="scene-toolbar">
+            <input id="scene-search" class="scene-search" type="search" placeholder="Search scenes">
+            <button id="scene-favorites-filter" class="scene-filter-btn" type="button" aria-pressed="false">Favorites</button>
+          </div>
+          <div id="scene-category-row" class="scene-filter-row" aria-label="Scene categories"></div>
           <div id="scene-preset-grid" class="scene-preset-grid prompt-chip-grid" aria-label="Scene presets"></div>
           <div class="scene-actions prompt-compact-row">
             <span id="scene-status" class="scene-status">Select a scene for this or the next session.</span>
@@ -1548,11 +1694,7 @@
           <strong>Style</strong><br>
           Adjust the visual look without changing identity, face, outfit, or body shape.
         </div>
-        <div class="mode-preset-grid prompt-chip-grid" aria-label="Style presets">
-          <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply cinematic realistic lighting and color while preserving the person, face, outfit, and identity.">Cinematic</button>
-          <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply soft studio lighting and natural color while preserving the person, face, outfit, and identity.">Soft Lighting</button>
-          <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply high contrast editorial lighting while preserving the person, face, outfit, and identity.">High Contrast</button>
-          <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply a polished anime-inspired look while preserving the person, face, outfit, and identity.">Anime Look</button>
+        <div id="style-preset-grid" class="mode-preset-grid prompt-chip-grid" aria-label="Style presets">
         </div>
       </div>
 
@@ -1568,6 +1710,9 @@
           <input type="range" id="intensity-slider" min="0" max="100" value="100" step="5" class="intensity-slider">
           <div class="intensity-hints"><span>Subtle</span><span>Natural</span><span>Full</span></div>
         </div>
+        <div id="performance-grid" class="perf-grid" aria-label="Performance monitor"></div>
+        <pre id="prompt-debug" class="prompt-debug">Prompt debug will appear after Apply Prompt.</pre>
+        <div id="settings-sections" class="scene-filter-row" aria-label="Settings sections"></div>
       </div>
       </div>
     </div>
@@ -1595,6 +1740,22 @@
 </div>
 
 <script type="module">
+import {
+  SESSION_STATES,
+  canStartSession,
+  canStopSession,
+  setSessionState,
+  subscribeSessionState,
+} from "./sessionState.js";
+import { describeSessionState, getActionAvailability } from "./sessionIndicators.js";
+import { createStatusBannerSystem } from "./statusBanner.js";
+import { buildIntensityLayer, buildPromptDebugSnapshot, composePrompt } from "./promptComposer.js";
+import { createSceneStore, getSceneCategories } from "./scenes.js";
+import { STYLE_PRESETS, findStyle } from "./styles.js";
+import { createPerformanceMonitor, formatDuration } from "./performanceMonitor.js";
+import { createErrorBoundary } from "./errorBoundary.js";
+import { createReconnectManager } from "./reconnectManager.js";
+import { getSettingsSections } from "./settingsArchitecture.js";
 
 // Reusable app modal alert component. Keep this isolated so dialog behavior
 // can be debugged independently from streaming/session code.
@@ -1716,8 +1877,15 @@ const presetsRow      = document.getElementById("presets-row");
 const scenePresetGrid = document.getElementById("scene-preset-grid");
 const sceneStateEl    = document.getElementById("scene-state");
 const sceneStatusEl   = document.getElementById("scene-status");
+const sceneSearchEl   = document.getElementById("scene-search");
+const sceneCategoryRow = document.getElementById("scene-category-row");
+const sceneFavoritesFilter = document.getElementById("scene-favorites-filter");
 const btnSceneApply   = document.getElementById("btn-scene-apply");
 const btnSceneReset   = document.getElementById("btn-scene-reset");
+const stylePresetGrid = document.getElementById("style-preset-grid");
+const performanceGrid = document.getElementById("performance-grid");
+const promptDebugEl   = document.getElementById("prompt-debug");
+const settingsSectionsEl = document.getElementById("settings-sections");
 const workspaceTabs   = document.querySelectorAll(".workspace-tab");
 const utilityPanels   = document.querySelectorAll(".utility-panel");
 const bottomRowEl     = document.querySelector(".bottom-row");
@@ -2075,6 +2243,94 @@ function setStatus(state, msg) {
   statusTxt.textContent = msg || "Disconnected";
 }
 
+const realtimeStatus = createStatusBannerSystem();
+const perfMonitor = createPerformanceMonitor();
+const errorBoundary = createErrorBoundary({
+  log,
+  showStatus: realtimeStatus.showStatus,
+});
+const reconnectManager = createReconnectManager({
+  onAttempt: ({ attempts, maxAttempts }) => {
+    perfMonitor.markReconnect();
+    log(`Reconnect attempt ${attempts}/${maxAttempts}`, "warning");
+    realtimeStatus.showStatus(`Reconnecting... attempt ${attempts}/${maxAttempts}`, { level: "warning" });
+  },
+  onTimer: ({ attempts }) => {
+    log(`Reconnect timer elapsed after attempt ${attempts}`, "info");
+  },
+  onExhausted: () => {
+    log("Reconnect attempts exhausted; stopping safely.", "error");
+    realtimeStatus.showStatus("Reconnect failed. Stopping safely.", { level: "error", persist: true });
+    doStop({ suppressSummary: true, source: "final" }).catch((err) => log(`Safe stop failed: ${err.message}`, "error"));
+  },
+});
+
+function renderPerformanceSnapshot() {
+  if (!performanceGrid) return;
+  const perf = perfMonitor.getSnapshot();
+  const reconnect = reconnectManager.getSnapshot();
+  const rows = [
+    ["FPS", perf.fps ? `${perf.fps}` : "--"],
+    ["Latency", perf.streamLatencyMs ? `${perf.streamLatencyMs}ms` : "--"],
+    ["RTT", perf.decartRttMs ? `${perf.decartRttMs}ms` : "--"],
+    ["Uptime", formatDuration(perf.uptimeMs)],
+    ["Reconnects", `${perf.reconnectCount}/${reconnect.maxAttempts}`],
+    ["Retry In", reconnect.secondsUntilRetry ? `${reconnect.secondsUntilRetry}s` : "--"],
+    ["Decart Env", window._lastDecartEnvironmentUsed || "unknown"],
+  ];
+  performanceGrid.innerHTML = rows.map(([label, value]) =>
+    `<div class="perf-pill"><span class="perf-label">${label}</span><span class="perf-value">${value}</span></div>`
+  ).join("");
+}
+
+function updatePromptDebug(snapshot) {
+  if (!promptDebugEl || !snapshot) return;
+  promptDebugEl.textContent = [
+    `Layers: ${snapshot.activeLayers.join(", ") || "none"}`,
+    `Scene: ${snapshot.activeScene || "none"}`,
+    `Style: ${snapshot.activeStyle || "none"}`,
+    `Prompt: ${snapshot.finalPrompt}`,
+  ].join("\n");
+}
+
+function renderSettingsSections() {
+  if (!settingsSectionsEl) return;
+  settingsSectionsEl.innerHTML = "";
+  getSettingsSections().forEach((section) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "scene-filter-btn";
+    chip.title = section.description;
+    chip.textContent = section.name;
+    chip.addEventListener("click", () => {
+      log(`Settings section ready: ${section.name}`, "info");
+      realtimeStatus.showStatus(`${section.name} settings scaffold ready`, { level: "info" });
+    });
+    settingsSectionsEl.appendChild(chip);
+  });
+}
+renderSettingsSections();
+setInterval(renderPerformanceSnapshot, 1000);
+
+subscribeSessionState((state) => {
+  const description = describeSessionState(state);
+  setStatus(description.badge, description.label);
+  const availability = getActionAvailability(state, {
+    starting: _startInProgress,
+    stopping: _stopInProgress,
+    applying: sceneApplyInProgress,
+    hasQueuedScene: !!getSelectedScenePreset(),
+    recordingBlocked: !outputVideo.srcObject,
+  });
+  if (btnStart) btnStart.disabled = !availability.start;
+  if (btnStop) btnStop.disabled = !availability.stop;
+  if (btnApply) btnApply.disabled = !availability.applyPrompt;
+  if (btnSceneApply) btnSceneApply.disabled = !availability.applyScene;
+  if (btnRecord) { btnRecord.disabled = !availability.record; syncRecordActionButton(); }
+  if (state.previous !== state.value) log(`Session state: ${state.value}`, "info");
+  renderPerformanceSnapshot();
+}, { immediate: false });
+
 // 
 // IDENTITY SLOTS
 // 
@@ -2300,124 +2556,83 @@ promptEl.addEventListener("input", () => {
 
 renderPresets(PRESETS);
 
-// Scene/background preset Lego module. This stays renderer-local for now:
-// model -> UI state -> Decart prompt routing.
-const SCENE_PRESET_KEY = "tzurah_selected_scene_preset";
-const SCENE_PRESETS = [
-  {
-    id: "professional-studio",
-    name: "Professional Studio",
-    category: "Studio",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a professional broadcast studio with soft key lighting, acoustic wall panels, a clean desk, and shallow depth of field",
-    negative_prompt: "crowded background, harsh shadows, distorted face",
-  },
-  {
-    id: "modern-office",
-    name: "Modern Office",
-    category: "Work",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a modern office interior with glass walls, tasteful plants, warm overhead lighting, and a tidy executive workspace",
-    negative_prompt: "busy clutter, unreadable signage, warped furniture",
-  },
-  {
-    id: "luxury-apartment",
-    name: "Luxury Apartment",
-    category: "Interior",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a luxury apartment living room with floor-to-ceiling windows, neutral furniture, city views, and elegant ambient lighting",
-    negative_prompt: "overexposed windows, clutter, changed person identity",
-  },
-  {
-    id: "podcast-room",
-    name: "Podcast Room",
-    category: "Studio",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a cozy podcast recording room with warm lamps, sound treatment, shelves, and a professional creator setup",
-    negative_prompt: "extra microphones covering the face, messy cables, distorted hands",
-  },
-  {
-    id: "neon-cyberpunk",
-    name: "Neon Cyberpunk",
-    category: "Stylized",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a neon cyberpunk city backdrop with magenta and cyan signs, rain-slick reflections, and cinematic night lighting",
-    negative_prompt: "identity change, excessive blur, unreadable face",
-  },
-  {
-    id: "outdoor-park",
-    name: "Outdoor Park",
-    category: "Outdoor",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a bright outdoor park with green trees, soft daylight, a natural walkway, and gentle background bokeh",
-    negative_prompt: "wind-blown face distortion, crowds, harsh sun glare",
-  },
-  {
-    id: "beach-sunset",
-    name: "Beach Sunset",
-    category: "Outdoor",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a beach at sunset with warm golden light, calm waves, soft sand, and a relaxed cinematic horizon",
-    negative_prompt: "wet subject, changed clothing, strong lens flare over face",
-  },
-  {
-    id: "minimal-white-room",
-    name: "Minimal White Room",
-    category: "Clean",
-    mode: "both",
-    is_builtin: true,
-    is_active: true,
-    prompt: "a minimal white room with clean walls, soft studio lighting, subtle shadows, and a distraction-free professional look",
-    negative_prompt: "blank cutout edges, overexposure, flattened face",
-  },
-];
-
-let selectedScenePresetId = localStorage.getItem(SCENE_PRESET_KEY) || "";
+// Scene/background preset Lego module:
+// scene object store -> bounded UI -> Decart prompt routing.
+const sceneStore = createSceneStore({ storage: localStorage });
+const sceneCategories = ["All", "Recent", ...getSceneCategories(sceneStore.all).filter((category) => category !== "All")];
+let sceneCategoryFilter = "All";
+let sceneFavoritesOnly = false;
+let selectedScenePresetId = sceneStore.getSelected()?.id || "";
 let sceneApplyInProgress = false;
+let activeStyleId = localStorage.getItem("loqii_active_style_id") || "";
 
 function getSelectedScenePreset() {
-  return SCENE_PRESETS.find((preset) => preset.id === selectedScenePresetId && preset.is_active !== false) || null;
+  return sceneStore.getSelected();
 }
 
 function setSceneStatus(message) {
   if (sceneStatusEl) sceneStatusEl.textContent = message;
 }
 
+function renderSceneFilters() {
+  if (!sceneCategoryRow) return;
+  sceneCategoryRow.innerHTML = "";
+  sceneCategories.forEach((category) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "scene-filter-btn" + (category === sceneCategoryFilter ? " active" : "");
+    btn.textContent = category;
+    btn.addEventListener("click", () => {
+      sceneCategoryFilter = category;
+      renderScenePresets();
+    });
+    sceneCategoryRow.appendChild(btn);
+  });
+  if (sceneFavoritesFilter) {
+    sceneFavoritesFilter.classList.toggle("active", sceneFavoritesOnly);
+    sceneFavoritesFilter.setAttribute("aria-pressed", sceneFavoritesOnly ? "true" : "false");
+  }
+}
+
 function renderScenePresets() {
   if (!scenePresetGrid) return;
   const selected = getSelectedScenePreset();
+  renderSceneFilters();
   scenePresetGrid.innerHTML = "";
-  SCENE_PRESETS.filter((preset) => preset.is_active !== false).forEach((preset) => {
+  const scenes = sceneCategoryFilter === "Recent" ? sceneStore.getRecent() : sceneStore.search({
+    query: sceneSearchEl?.value || "",
+    category: sceneCategoryFilter,
+    favoritesOnly: sceneFavoritesOnly,
+  });
+  scenes.forEach((preset) => {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "scene-card" + (preset.id === selectedScenePresetId ? " active" : "");
     card.setAttribute("aria-pressed", preset.id === selectedScenePresetId ? "true" : "false");
+    card.style.setProperty("--scene-color", preset.previewColor || "#3F6C51");
 
     const name = document.createElement("span");
     name.className = "scene-card-name";
-    name.textContent = preset.name;
+    name.textContent = `${sceneStore.isFavorite(preset.id) ? "* " : ""}${preset.name}`;
     const meta = document.createElement("span");
     meta.className = "scene-card-meta";
-    meta.textContent = `${preset.category} - ${preset.mode}`;
+    meta.textContent = `${preset.category} - ${preset.description}`;
     card.append(name, meta);
 
     card.addEventListener("click", () => selectScenePreset(preset.id));
+    card.addEventListener("dblclick", () => {
+      sceneStore.toggleFavorite(preset.id);
+      renderScenePresets();
+      realtimeStatus.showStatus(sceneStore.isFavorite(preset.id) ? "Scene favorited" : "Scene unfavorited", { level: "success" });
+    });
     scenePresetGrid.appendChild(card);
   });
+  if (scenes.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "scene-status";
+    empty.textContent = "No scenes match this filter.";
+    scenePresetGrid.appendChild(empty);
+  }
 
   if (sceneStateEl) {
     sceneStateEl.textContent = selected ? `${selected.name} selected` : "No scene selected";
@@ -2426,9 +2641,8 @@ function renderScenePresets() {
 }
 
 function selectScenePreset(presetId) {
-  selectedScenePresetId = presetId;
-  localStorage.setItem(SCENE_PRESET_KEY, presetId);
-  const selected = getSelectedScenePreset();
+  const selected = sceneStore.select(presetId);
+  selectedScenePresetId = selected?.id || "";
   renderScenePresets();
   if (!selected) return;
   if (isConnected && realtimeClient) {
@@ -2439,15 +2653,16 @@ function selectScenePreset(presetId) {
 }
 
 function buildDecartScenePrompt(identityPrompt, selectedScenePreset) {
-  const identity = (identityPrompt || "Preserve the current person and facial identity.").trim();
-  if (!selectedScenePreset) return identity;
-  const scene = selectedScenePreset.prompt.trim().replace(/[.!?]?\s*$/, ".");
-  return [
-    identity.replace(/\s+$/, ""),
-    `Environment/background: ${scene}`,
-    "Preserve the same person, facial identity, expression, skin tone, hair, and clothing unless the identity prompt explicitly requests otherwise.",
-    "Only change the environment/background. Keep clean subject edges, natural perspective, and consistent lighting. Do not change person identity.",
-  ].join(" ");
+  const scene = selectedScenePreset ? [
+    `Environment/background: ${selectedScenePreset.backgroundPrompt}`,
+    selectedScenePreset.lightingPrompt,
+    selectedScenePreset.cameraPrompt,
+  ].join(" ") : "";
+  return composePrompt({
+    identityLayer: identityPrompt || "Preserve the current person and facial identity.",
+    backgroundLayer: scene,
+    safetyLayer: "Preserve the same person, facial identity, expression, skin tone, hair, and clothing unless explicitly requested otherwise. Keep clean subject edges. Do not change person identity.",
+  }).prompt;
 }
 
 async function applyDecartScenePreset(session, preset) {
@@ -2459,12 +2674,16 @@ async function applyDecartScenePreset(session, preset) {
 
   const promptText = buildDecartScenePrompt(promptEl.value.trim(), preset);
   const img = getActiveRefImage();
+  const setStartedAt = performance.now();
   if (typeof session.set === "function") {
     await session.set({ prompt: promptText, image: img || undefined, enhance: true });
   } else {
     await session.setPrompt(promptText, { enhance: true });
     if (img && typeof session.setImage === "function") await session.setImage(img);
   }
+  perfMonitor.markPromptUpdate();
+  perfMonitor.markDecartRtt(performance.now() - setStartedAt);
+  renderPerformanceSnapshot();
 
   window._lastSceneApplication = {
     preset_id: preset.id,
@@ -2477,8 +2696,8 @@ async function applyDecartScenePreset(session, preset) {
 }
 
 async function resetDecartScene(session) {
+  sceneStore.clear();
   selectedScenePresetId = "";
-  localStorage.removeItem(SCENE_PRESET_KEY);
   renderScenePresets();
   setSceneStatus("Scene reset. The base prompt is active.");
   if (session) await applySet();
@@ -2490,6 +2709,7 @@ async function applySelectedScenePreset() {
   sceneApplyInProgress = true;
   renderScenePresets();
   try {
+    realtimeStatus.showStatus("Applying scene...", { level: "info", timeout: 1600 });
     const result = await applyDecartScenePreset(realtimeClient, preset);
     if (result.pending) {
       log(`Scene queued for next session: ${preset.name}`, "info");
@@ -2498,8 +2718,10 @@ async function applySelectedScenePreset() {
       log(`Scene applied: ${preset.name}`, "success");
       setSceneStatus(`${preset.name} applied to the active session.`);
       addCenterAlert("connection", `Scene applied: ${preset.name}`);
+      realtimeStatus.showStatus("Background updated", { level: "success" });
     }
   } catch (err) {
+    errorBoundary.capture("Scene apply", err);
     log(`Scene apply failed: ${err.message}`, "error");
     setSceneStatus(`Scene apply failed: ${err.message}`);
   } finally {
@@ -2523,6 +2745,11 @@ btnSceneReset?.addEventListener("click", async () => {
     sceneApplyInProgress = false;
     renderScenePresets();
   }
+});
+sceneSearchEl?.addEventListener("input", renderScenePresets);
+sceneFavoritesFilter?.addEventListener("click", () => {
+  sceneFavoritesOnly = !sceneFavoritesOnly;
+  renderScenePresets();
 });
 renderScenePresets();
 
@@ -3098,6 +3325,8 @@ async function stopSession() {
   isConnected          = false;
   hasAppliedInitialSet = false;
   lastGeneratingTime   = 0;
+  reconnectManager.reset();
+  perfMonitor.stopSession();
   if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; }
   if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
   if (realtimeClient) { try { realtimeClient.disconnect(); } catch (_) {} realtimeClient = null; }
@@ -3119,11 +3348,13 @@ async function stopSession() {
   if (fpsCounter) fpsCounter.style.display = "none";
   hideReconnectBanner();
   currentSessionId   = null;
+  renderPerformanceSnapshot();
 }
 
 async function doStop(options = {}) {
   if (_stopInProgress) return _stopPromise || { snapDuration: 0, snapUsed: 0, snapLeft: localCredits };
   _stopInProgress = true;
+  setSessionState(SESSION_STATES.STOPPING, { reason: options.source || "manual_stop" });
   _stopPromise = (async () => {
   const { suppressSummary = false, source = "manual_stop" } = options;
   log("Stopping session...", "info");
@@ -3154,6 +3385,7 @@ async function doStop(options = {}) {
   hasFinalSyncedSession = false;
 
   setStatus("", "Disconnected");
+  setSessionState(SESSION_STATES.IDLE, { reason: "stopped" });
   log("Session stopped", "warning");
 
   if (snapDuration > 0 && !suppressSummary) {
@@ -3227,11 +3459,12 @@ async function getAPIToken() {
 
 //  Start 
 btnStart.addEventListener("click", async () => {
-  if (_startInProgress || _stopInProgress) {
+  if (_startInProgress || _stopInProgress || !canStartSession()) {
     log("Session cleanup in progress. Please wait...", "warning");
     return;
   }
   _startInProgress = true;
+  setSessionState(SESSION_STATES.CONNECTING, { reason: "start_clicked" });
   btnStart.disabled = true;
   btnApply.disabled = true;
 
@@ -3242,6 +3475,7 @@ btnStart.addEventListener("click", async () => {
         log("Not signed in  please log in first.", "error");
         btnStart.disabled = false;
         _startInProgress = false;
+        setSessionState(SESSION_STATES.IDLE, { reason: "not_signed_in" });
         return;
       }
       const { credits } = await window.tzurah.getBalance();
@@ -3252,6 +3486,7 @@ btnStart.addEventListener("click", async () => {
         addCenterAlert("error", `Not enough credits to start. Minimum: ${Math.ceil(minimumToStart)} credits`);
         btnStart.disabled = false;
         _startInProgress = false;
+        setSessionState(SESSION_STATES.IDLE, { reason: "insufficient_credits" });
         return;
       }
       localCredits        = credits;
@@ -3337,6 +3572,9 @@ btnStart.addEventListener("click", async () => {
     });
 
     isConnected  = true;
+    setSessionState(SESSION_STATES.CONNECTED, { reason: "webrtc_connected" });
+    perfMonitor.startSession();
+    renderPerformanceSnapshot();
     sessionStart = Date.now();
     startStats();
 
@@ -3359,12 +3597,15 @@ btnStart.addEventListener("click", async () => {
 
       if (state === "generating") {
         lastGeneratingTime = Date.now();
+        setSessionState(SESSION_STATES.STREAMING, { reason: "sdk_generating" });
         setStatus("connected", "Connected");
         btnApply.disabled = false;
+        reconnectManager.reset();
         hideReconnectBanner();
         if (!hasAppliedInitialSet) {
           hasAppliedInitialSet = true;
           addCenterAlert("connection", "Connected to Decart  face swap active");
+          realtimeStatus.showStatus("Streaming live", { level: "success" });
           startSessionPing();
           if (btnRecord) { btnRecord.disabled = false; syncRecordActionButton(); }
           try {
@@ -3377,6 +3618,8 @@ btnStart.addEventListener("click", async () => {
       }
 
       if (state === "reconnecting") {
+        setSessionState(SESSION_STATES.RECONNECTING, { reason: "sdk_reconnecting" });
+        reconnectManager.noteReconnect("sdk_reconnecting");
         setStatus("connecting", "Reconnecting...");
         addCenterAlert("connection", "Connection interrupted  reconnecting...");
         showReconnectBanner();
@@ -3386,6 +3629,7 @@ btnStart.addEventListener("click", async () => {
         disconnectTimer = setTimeout(() => {
           disconnectTimer = null;
           if (isConnected && lastGeneratingTime > 0) {
+            setSessionState(SESSION_STATES.DISCONNECTED, { reason: "sdk_disconnected" });
             setStatus("", "Disconnected");
             addCenterAlert("connection", "Session disconnected");
             doStop({ source: "final" }).then(() => log("Session ended", "warning"));
@@ -3394,14 +3638,18 @@ btnStart.addEventListener("click", async () => {
       }
     });
     realtimeClient.on("error", (err) => {
+      setSessionState(SESSION_STATES.FAILED, { reason: "sdk_error" });
       log(`SDK error: ${err.message ?? err}`, "error");
       addCenterAlert("error", `SDK error: ${err.message ?? err}`);
+      realtimeStatus.showStatus("Session failed", { level: "error", persist: true });
     });
     _startInProgress = false;
 
   } catch (err) {
     console.error("Start failed:", err);
     log(`FAILED: ${err.message}`, "error");
+    errorBoundary.capture("Session start", err);
+    setSessionState(SESSION_STATES.FAILED, { reason: "start_failed" });
     setStatus("error", "Error");
     await stopSession();
     btnStart.disabled = false;
@@ -3414,49 +3662,51 @@ async function applySet(retries = 3) {
   if (!realtimeClient) return;
   const basePrompt = promptEl.value.trim() || "Substitute the character in the video with a person.";
   const val = currentIntensity;
-  let promptText = basePrompt;
-
-  if (currentMode === "face") {
-    let prefix;
-    if (val <= 30)      prefix = "Slightly modify the character in the video,";
-    else if (val <= 60) prefix = "Moderately transform the character in the video,";
-    else if (val <= 90) prefix = "Strongly transform the character in the video,";
-    else                prefix = "Completely substitute the character in the video with,";
-    promptText = `${prefix} ${basePrompt}`;
-  } else if (currentMode === "background") {
-    let suffix;
-    if (val <= 30)      suffix = ", subtle blend, keep some original background visible";
-    else if (val <= 60) suffix = ", moderate replacement";
-    else if (val <= 90) suffix = ", full background replacement";
-    else                suffix = ", complete background replacement, photorealistic, seamless edges";
-    promptText = basePrompt.replace(/[.,!]?\s*$/, "") + suffix + ".";
-  } else if (currentMode === "style") {
-    let suffix;
-    if (val <= 30)      suffix = ", very subtle style, mostly original";
-    else if (val <= 60) suffix = ", moderate style application";
-    else if (val <= 90) suffix = ", strong style transformation";
-    else                suffix = ", maximum style transformation, fully stylized";
-    promptText = basePrompt.replace(/[.,!]?\s*$/, "") + suffix + ".";
-  }
-
   const scenePreset = getSelectedScenePreset();
+  const activeStyle = findStyle(activeStyleId);
+  const sceneLayer = scenePreset ? [
+    scenePreset.backgroundPrompt,
+    scenePreset.lightingPrompt,
+    scenePreset.cameraPrompt,
+  ].join(" ") : "";
+  const composed = composePrompt({
+    identityLayer: currentMode === "face"
+      ? `${buildIntensityLayer("face", val)} ${basePrompt}`
+      : "Preserve the current person and facial identity.",
+    backgroundLayer: currentMode === "background" ? `${basePrompt} ${buildIntensityLayer("background", val)}` : sceneLayer,
+    styleLayer: currentMode === "style" ? `${basePrompt} ${buildIntensityLayer("style", val)}` : activeStyle?.prompt,
+    enhancementLayer: currentMode !== "face" ? buildIntensityLayer(currentMode, val) : "",
+    safetyLayer: "Preserve identity, face, expression, skin tone, outfit, pose, and body shape unless explicitly requested. Keep stable subject edges and readable facial detail.",
+  });
+  const promptText = composed.prompt;
+
   if (scenePreset) {
-    promptText = buildDecartScenePrompt(promptText, scenePreset);
     setSceneStatus(`${scenePreset.name} active for this set().`);
   }
+  updatePromptDebug(buildPromptDebugSnapshot({
+    ...composed,
+    scene: scenePreset,
+    style: activeStyle,
+    background: currentMode === "background" ? { name: "Prompt background" } : null,
+  }));
 
   const img = getActiveRefImage();
   log(`set() prompt: "${promptText.slice(0,60)}${promptText.length>60?"...":""}"`, "send");
+  log(`Prompt layers: ${composed.activeLayers.join(", ")}`, "info");
   if (img) log(` set()  image: ${img.name} (${(img.size/1024).toFixed(0)} KB)`, "send");
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      const setStartedAt = performance.now();
       if (typeof realtimeClient.set === "function") {
         await realtimeClient.set({ prompt: promptText, image: img || undefined, enhance: true });
       } else {
         await realtimeClient.setPrompt(promptText, { enhance: true });
         if (img) await realtimeClient.setImage(img);
       }
+      perfMonitor.markPromptUpdate();
+      perfMonitor.markDecartRtt(performance.now() - setStartedAt);
+      renderPerformanceSnapshot();
       if (scenePreset) {
         window._lastSceneApplication = {
           preset_id: scenePreset.id,
@@ -3483,7 +3733,15 @@ async function applySet(retries = 3) {
 btnApply.addEventListener("click", async () => {
   if (!realtimeClient) return;
   btnApply.disabled = true;
-  try { await applySet(); } finally { btnApply.disabled = false; }
+  realtimeStatus.showStatus(currentMode === "style" ? "Updating style..." : "Applying prompt...", { level: "info", timeout: 1600 });
+  try {
+    await applySet();
+    realtimeStatus.showStatus(currentMode === "style" ? "Style updated" : "Prompt updated", { level: "success" });
+  } catch (err) {
+    errorBoundary.capture("Prompt update", err);
+  } finally {
+    btnApply.disabled = false;
+  }
 });
 
 //  OBS streaming 
@@ -3557,7 +3815,7 @@ document.getElementById("console-toggle-btn")?.addEventListener("click", () => {
 
 //  Stop button 
 btnStop.addEventListener("click", () => {
-  if (!isConnected && !realtimeClient) return;
+  if (!isConnected && !realtimeClient && !canStopSession()) return;
   doStop({ source: "manual_stop" });
 });
 
@@ -3639,6 +3897,7 @@ function startRecording() {
     mediaRecorder.onstop  = () => { if (recordedChunks.length > 0) saveRecording(); };
     mediaRecorder.start(2000);
     isRecording = true;
+    setSessionState(SESSION_STATES.RECORDING, { reason: "recording_started" });
     recordingStartTime = Date.now();
     btnRecord.classList.add("recording");
     syncRecordActionButton();
@@ -3654,6 +3913,7 @@ function startRecording() {
 function stopRecording() {
   if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
   isRecording = false;
+  if (isConnected) setSessionState(SESSION_STATES.STREAMING, { reason: "recording_stopped" });
   clearInterval(recordingTimer);
   recordingTimer = null;
   if (btnRecord) { btnRecord.textContent = "Record"; btnRecord.classList.remove("recording"); }
@@ -4099,10 +4359,31 @@ btnRandomPrompt?.addEventListener("click", () => {
   promptEl.focus();
 });
 
+function renderStylePresets() {
+  if (!stylePresetGrid) return;
+  stylePresetGrid.innerHTML = "";
+  STYLE_PRESETS.forEach((style) => {
+    const btn = document.createElement("button");
+    btn.className = "mode-preset-btn" + (style.id === activeStyleId ? " active" : "");
+    btn.type = "button";
+    btn.dataset.modePreset = "style";
+    btn.dataset.styleId = style.id;
+    btn.dataset.prompt = `Apply ${style.prompt}. Preserve the person, face, outfit, and identity.`;
+    btn.textContent = style.name;
+    stylePresetGrid.appendChild(btn);
+  });
+}
+renderStylePresets();
+
 document.querySelectorAll("[data-mode-preset]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const nextMode = btn.dataset.modePreset || "face";
     switchMode(nextMode);
+    if (btn.dataset.styleId) {
+      activeStyleId = btn.dataset.styleId;
+      localStorage.setItem("loqii_active_style_id", activeStyleId);
+      renderStylePresets();
+    }
     if (btn.dataset.prompt) {
       promptEl.value = btn.dataset.prompt;
       promptEl.dispatchEvent(new Event("input", { bubbles: true }));
@@ -4260,6 +4541,8 @@ function trackFPS() {
   const elapsed = now - fpsLastTime;
   if (elapsed >= 1000) {
     currentFPS = Math.round(fpsFrameCount * 1000 / elapsed);
+    perfMonitor.setFps(currentFPS);
+    renderPerformanceSnapshot();
     fpsFrameCount = 0;
     fpsLastTime = now;
     if (fpsCounter) {
@@ -4754,6 +5037,8 @@ window.addEventListener("load", () => {
   await loadFeatureFlags();
   await initSlots();
   renderPresets(MODE_PRESETS[currentMode]);
+  renderPerformanceSnapshot();
+  setSessionState(SESSION_STATES.IDLE, { reason: "app_ready" });
   setTimeout(() => checkOnboarding(), 2000);
   setTimeout(() => checkAnnouncements(), 1000);
   setInterval(() => checkAnnouncements(), 5 * 60 * 1000);
