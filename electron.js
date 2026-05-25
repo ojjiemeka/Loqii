@@ -1,16 +1,16 @@
-﻿/**
- * electron.js â€” Electron main process  (CommonJS)
+/**
+ * electron.js  Electron main process  (CommonJS)
  *
  * Architecture:
- *   Auth      â†’ Supabase (email/password + Google OAuth via deep link)
- *   Payments  â†’ Stripe via GCP server (rtdf://payment/success deep link)
- *   Local DB  â†’ SQLite cache (db.js) for tokens + credit balance
+ *   Auth       Supabase (email/password + Google OAuth via deep link)
+ *   Payments   Stripe via GCP server (rtdf://payment/success deep link)
+ *   Local DB   SQLite cache (db.js) for tokens + credit balance
  *
  * Window flow:
- *   Not logged in â†’ login.html (480Ã—640, loadFile)
- *   Logged in     â†’ index.html (1440Ã—900, loadURL via local Express)
- *   Top-up modal  â†’ topup.html (900Ã—700, loadFile)
- *   Dashboard     â†’ dashboard.html (600Ã—700, loadFile)
+ *   Not logged in  login.html (480640, loadFile)
+ *   Logged in      index.html (1440900, loadURL via local Express)
+ *   Top-up modal   topup.html (900700, loadFile)
+ *   Dashboard      dashboard.html (600700, loadFile)
  */
 
 "use strict";
@@ -25,13 +25,13 @@ const fs = require("fs");
 const path            = require("path");
 let autoUpdater       = null;
 
-// â”€â”€ Local modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Local modules 
 const db       = require("./db.js");
 const supabase = require("./supabase.js");
 
-// Service-role client â€” bypasses RLS, used only in main process for balance reads.
+// Service-role client  bypasses RLS, used only in main process for balance reads.
 // NOTE: Renderer uses bootstrap config (fetched via server.mjs /api/config), not these env vars.
-// These are ONLY for main-process IPC operations (auth, credit reads) â€” never sent to renderer.
+// These are ONLY for main-process IPC operations (auth, credit reads)  never sent to renderer.
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const supabaseAdmin = createSupabaseClient(
   process.env.SUPABASE_URL              || "",
@@ -41,7 +41,7 @@ const supabaseAdmin = createSupabaseClient(
 
 // Startup: warn if service key is missing (blocks auth IPC handlers)
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("[STARTUP] SUPABASE_SERVICE_ROLE_KEY not set â€” auth features will fail");
+  console.error("[STARTUP] SUPABASE_SERVICE_ROLE_KEY not set  auth features will fail");
   // Show dialog after app is ready (can't call dialog before ready)
   app.whenReady().then(() => {
     dialog.showMessageBoxSync({
@@ -53,15 +53,15 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   });
 }
 
-// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Config 
 const PORT           = parseInt(process.env.EXPRESS_PORT || "3000", 10);
 const GCP_SERVER_URL = process.env.GCP_SERVER_URL || "http://localhost:4000";
 const isDev          = !app.isPackaged;
-// DEV BYPASS â€” remove before shipping
+// DEV BYPASS  remove before shipping
 const devBypass      = process.env.NODE_ENV === "development" || process.argv.includes("--dev");
 app.setName("Loqii");
 
-// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  State 
 let mainWin      = null;
 let topupWin     = null;
 let dashboardWin = null;
@@ -88,11 +88,11 @@ function getAutoUpdater() {
   return autoUpdater;
 }
 
-// â”€â”€ Protocol registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Protocol registration 
 // Must be called before app.whenReady() on Windows
 app.setAsDefaultProtocolClient("tzurah");
 
-// â”€â”€ Single-instance lock + deep-link handler (Windows) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Single-instance lock + deep-link handler (Windows) 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
@@ -115,7 +115,7 @@ app.on("open-url", (event, url) => {
   handleDeepLink(url);
 });
 
-// â”€â”€ Deep link router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Deep link router 
 function handleDeepLink(rawUrl) {
   let parsed;
   try { parsed = new URL(rawUrl); } catch { return; }
@@ -146,13 +146,13 @@ function handleDeepLink(rawUrl) {
     return;
   }
 
-  // tzurah://payment/cancel â€” just close topup window
+  // tzurah://payment/cancel  just close topup window
   if (parsed.hostname === "payment" && parsed.pathname.includes("cancel")) {
     if (topupWin && !topupWin.isDestroyed()) topupWin.close();
   }
 }
 
-// â”€â”€ Token helpers (safeStorage encryption) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Token helpers (safeStorage encryption) 
 function encryptToken(raw) {
   if (!raw) return null;
   if (safeStorage.isEncryptionAvailable()) {
@@ -163,24 +163,24 @@ function encryptToken(raw) {
 
 function decryptToken(stored) {
   if (!stored) return null;
-  // Plain JWT (dev mode tokens, or safeStorage-unavailable fallback) â€” return as-is
+  // Plain JWT (dev mode tokens, or safeStorage-unavailable fallback)  return as-is
   if (stored.startsWith("eyJ")) return stored;
   if (safeStorage.isEncryptionAvailable()) {
     try { return safeStorage.decryptString(Buffer.from(stored, "base64")); }
-    catch { return null; } // corrupt stored value â€” treat as missing
+    catch { return null; } // corrupt stored value  treat as missing
   }
   return stored;
 }
 
-// â”€â”€ Supabase session helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Supabase session helpers 
 
 /**
  * Attempts to restore the Supabase session from the local DB.
  *
  * Strategy:
- *  1. If access token is structurally valid and not expired â†’ setSession().
- *  2. If that fails (or token is expired) â†’ refreshSession() with refresh_token.
- *  3. If refresh also fails â†’ return null (caller clears session + shows login).
+ *  1. If access token is structurally valid and not expired  setSession().
+ *  2. If that fails (or token is expired)  refreshSession() with refresh_token.
+ *  3. If refresh also fails  return null (caller clears session + shows login).
  *
  * Never throws. Never logs scary error messages to the console.
  */
@@ -191,7 +191,7 @@ async function restoreSupabaseSession() {
   const accessToken  = decryptToken(local.access_token);
   const refreshToken = decryptToken(local.refresh_token);
 
-  // â”€â”€ Fast path: access token looks valid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  //  Fast path: access token looks valid 
   if (db.validateToken(accessToken)) {
     try {
       const { data, error } = await supabase.auth.setSession({
@@ -213,7 +213,7 @@ async function restoreSupabaseSession() {
     } catch { /* fall through to refresh path */ }
   }
 
-  // â”€â”€ Refresh path: access token invalid/expired â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  //  Refresh path: access token invalid/expired 
   if (!refreshToken) return null;
   try {
     const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
@@ -226,7 +226,7 @@ async function restoreSupabaseSession() {
     });
     return data.session;
   } catch {
-    return null; // refresh failed â€” caller will clear session
+    return null; // refresh failed  caller will clear session
   }
 }
 
@@ -242,10 +242,10 @@ async function getFreshAccessToken() {
   const accessToken  = decryptToken(local.access_token);
   const refreshToken = decryptToken(local.refresh_token);
 
-  // Token has > 5 minutes remaining â€” use it as-is
+  // Token has > 5 minutes remaining  use it as-is
   if (db.validateToken(accessToken, 5 * 60)) return accessToken;
 
-  // Token expired or close to expiry â€” proactively refresh
+  // Token expired or close to expiry  proactively refresh
   if (!refreshToken) return accessToken; // last resort
   try {
     const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
@@ -294,7 +294,7 @@ async function ensureProfileForUser(accessToken) {
   }
 }
 
-// â”€â”€ Window factories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Window factories 
 
 function ensureMainWin() {
   if (mainWin && !mainWin.isDestroyed()) return;
@@ -396,11 +396,11 @@ function openDashboard() {
   dashboardWin.on("closed", () => { dashboardWin = null; });
 }
 
-// â”€â”€ System tray â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  System tray 
 function createTray() {
   const iconPath = path.join(__dirname, "assets", "tray-icon.png");
   tray = new Tray(nativeImage.createFromPath(iconPath));
-  tray.setToolTip("Loqii — AI Face Swap");
+  tray.setToolTip("Loqii  AI Face Swap");
   buildTrayMenu();
   tray.on("double-click", () => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.show();
@@ -420,7 +420,7 @@ function buildTrayMenu() {
   ]));
 }
 
-// â”€â”€ App menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  App menu 
 function buildAppMenu() {
   const js = (code) => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.executeJavaScript(code); };
   const template = [
@@ -470,7 +470,7 @@ function buildAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// â”€â”€ Local Express server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Local Express server 
 async function startExpress() {
   serverModule = await import("./server.mjs");
   expressServer = await serverModule.startServer(PORT);
@@ -571,7 +571,7 @@ async function gracefulShutdown(reason = "app-quit") {
   return shutdownPromise;
 }
 
-// â”€â”€ IPC: Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Auth 
 
 ipcMain.handle("auth:signup", async (_e, email, password, displayName) => {
   try {
@@ -582,7 +582,7 @@ ipcMain.handle("auth:signup", async (_e, email, password, displayName) => {
     });
     if (error) return { error: error.message };
 
-    // Supabase may require email confirmation â€” session may be null
+    // Supabase may require email confirmation  session may be null
     if (data.session) {
       db.saveSession({
         user_id:           data.user.id,
@@ -766,7 +766,7 @@ ipcMain.handle("auth:getAccessToken", async () => {
   }
 });
 
-// â”€â”€ IPC: Credits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Credits 
 
 ipcMain.handle("credits:getBalance", async () => {
   const local = db.getSession();
@@ -780,14 +780,14 @@ ipcMain.handle("credits:getBalance", async () => {
       .single();
 
     if (error) {
-      console.warn("[BALANCE] Supabase fetch error:", error.message, "â€” using local cache");
+      console.warn("[BALANCE] Supabase fetch error:", error.message, " using local cache");
     } else if (profile && typeof profile.credits === "number") {
       console.log("[BALANCE] Supabase:", profile.credits, "local cache:", local.credits_remaining);
       db.setCredits(profile.credits);
       return { credits: profile.credits };
     }
   } catch (err) {
-    console.warn("[BALANCE] Network error:", err.message, "â€” using local cache");
+    console.warn("[BALANCE] Network error:", err.message, " using local cache");
   }
 
   return { credits: local.credits_remaining };
@@ -802,15 +802,15 @@ ipcMain.handle("credits:deduct", async (_e, credits, seconds, metadata = null) =
     if (!w.isDestroyed()) w.webContents.send("credits:updated", localBalance);
   });
 
-  // Sync to GCP server â€” awaited so Supabase stays consistent
+  // Sync to GCP server  awaited so Supabase stays consistent
   try {
     const accessToken = await getFreshAccessToken();
     if (!accessToken) {
-      console.warn("[DEDUCT] No access token â€” skipping server sync, local balance:", localBalance);
+      console.warn("[DEDUCT] No access token  skipping server sync, local balance:", localBalance);
       return { remaining: localBalance };
     }
 
-    console.log("[DEDUCT] Syncing to server — credits:", credits, "seconds:", seconds, "token:", accessToken ? "present" : "missing");
+    console.log("[DEDUCT] Syncing to server  credits:", credits, "seconds:", seconds, "token:", accessToken ? "present" : "missing");
 
     const local = db.getSession();
     const billingMetadata = metadata && typeof metadata === "object" ? metadata : {};
@@ -858,7 +858,7 @@ ipcMain.handle("credits:deduct", async (_e, credits, seconds, metadata = null) =
       console.error("[DEDUCT] Server error", resp.status, ":", errText);
     }
   } catch (err) {
-    console.error("[DEDUCT] Network error:", err.message, "â€” local balance:", localBalance);
+    console.error("[DEDUCT] Network error:", err.message, " local balance:", localBalance);
   }
 
   return { remaining: localBalance };
@@ -901,7 +901,7 @@ ipcMain.handle("credits:sync", async (_e, metadata = null) => {
       return { ok: true };
     }
   } catch {
-    // Offline â€” will retry next time
+    // Offline  will retry next time
   }
   return { ok: false };
 });
@@ -926,7 +926,7 @@ ipcMain.handle("credits:getPurchases", async () => {
   }
 });
 
-// â”€â”€ IPC: Stripe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Stripe 
 
 ipcMain.handle("stripe:checkout", async (_e, pack) => {
   const local = db.getSession();
@@ -952,7 +952,7 @@ ipcMain.handle("stripe:checkout", async (_e, pack) => {
   }
 });
 
-// â”€â”€ IPC: Mock Purchase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Mock Purchase 
 ipcMain.handle("credits:mockPurchase", async (_e, packId) => {
   const local = db.getSession();
   if (!local) return { error: "Not logged in" };
@@ -982,7 +982,7 @@ ipcMain.handle("credits:mockPurchase", async (_e, packId) => {
   }
 });
 
-// â”€â”€ IPC: Windows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Windows 
 
 ipcMain.handle("app:openTopup",     () => openTopup());
 ipcMain.handle("app:openDashboard", () => openDashboard());
@@ -1007,7 +1007,7 @@ ipcMain.handle("app:relaunch", () => {
 
 ipcMain.handle("shell:openExternal", (_e, url) => shell.openExternal(url));
 
-// â”€â”€ IPC: Recording â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Recording 
 
 ipcMain.handle("recording:save", async (_e, dataArray, filename) => {
   const win = mainWin;
@@ -1026,12 +1026,12 @@ ipcMain.handle("recording:save", async (_e, dataArray, filename) => {
   }
 });
 
-// â”€â”€ IPC: Preferences â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IPC: Preferences 
 
 ipcMain.handle("prefs:get", (_e, key, defaultValue) => db.getPreference(key, defaultValue ?? null));
 ipcMain.handle("prefs:set", (_e, key, value) => { db.setPreference(key, value); return { ok: true }; });
 
-// DEV BYPASS â€” remove before shipping
+// DEV BYPASS  remove before shipping
 ipcMain.handle("auth:devBypass", () => {
   if (!devBypass) return { error: "Not in dev mode" };
   db.seedDevSession();
@@ -1039,7 +1039,7 @@ ipcMain.handle("auth:devBypass", () => {
   return { ok: true };
 });
 
-// â”€â”€ Auto-updater â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Auto-updater 
 function setupAutoUpdater() {
   if (isDev) return;
   const updater = getAutoUpdater();
@@ -1052,7 +1052,7 @@ function setupAutoUpdater() {
   });
 }
 
-// â”€â”€ App lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  App lifecycle 
 app.whenReady().then(async () => {
   // Start local Express server (serves index.html + /api/token + sdk-bundle.js)
   try {
@@ -1068,7 +1068,7 @@ app.whenReady().then(async () => {
   buildAppMenu();
   setupAutoUpdater();
 
-  // DEV MODE â€” show login screen so real accounts can be tested.
+  // DEV MODE  show login screen so real accounts can be tested.
   // The "Dev Bypass" button in login.html calls window.tzurah.devBypass()
   // which seeds a local session and skips straight to the main app.
   if (devBypass) {
@@ -1086,7 +1086,7 @@ app.whenReady().then(async () => {
       setTimeout(() => refreshCreditsFromServer().catch(() => {}), 2000);
       return;
     }
-    // Tokens expired and couldn't refresh â€” clear and show login
+    // Tokens expired and couldn't refresh  clear and show login
     db.clearSession();
   }
 
