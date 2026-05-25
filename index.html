@@ -404,7 +404,7 @@
       .video-row { grid-template-columns: 1fr; }
       .video-box { height: 230px; min-height: 230px; }
       .bottom-row { grid-template-columns: 1fr; }
-      .scene-preset-grid { grid-template-columns: 1fr; max-height: 190px; }
+      .scene-preset-grid { grid-template-columns: 1fr; max-height: 104px; }
       .scene-actions .btn { width: 100%; }
       .scene-status { min-width: 100%; }
     }
@@ -424,6 +424,11 @@
       backdrop-filter: blur(16px);
     }
     .identity-card, .controls-card, .console-card { contain: layout paint; }
+    .prompt-card {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
     .card-title {
       flex-shrink: 0; font-size: 0.62rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.07em;
@@ -535,10 +540,11 @@
 
     /*  Controls card  */
     .prompt-input {
-      flex: 1; min-height: 86px; max-height: 132px; width: 100%; padding: 10px 11px;
+      flex: 0 0 auto; height: clamp(76px, 16vh, 112px); min-height: 76px; max-height: 112px;
+      width: 100%; padding: 10px 11px;
       font-size: 0.82rem; font-family: inherit; color: var(--text);
       background: var(--field); border: 1px solid var(--border);
-      border-radius: 6px; resize: vertical; outline: none;
+      border-radius: 6px; resize: none; outline: none;
       line-height: 1.5; transition: border-color .15s;
     }
     .prompt-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(63,108,81,.16); }
@@ -612,6 +618,9 @@
       gap: 5px;
       margin-bottom: 8px;
     }
+    .prompt-mode-tabs {
+      flex: 0 0 auto;
+    }
     .workspace-tab {
       min-width: 0;
       padding: 6px 4px;
@@ -637,17 +646,44 @@
       display: none;
       min-height: 0;
       overflow: hidden;
-      flex: 1;
+      flex: 1 1 auto;
+      width: 100%;
     }
     .utility-panel.active {
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
+    .prompt-mode-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+    }
+    .prompt-mode-scroll {
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding-right: 2px;
+      scrollbar-width: thin;
+    }
+    .prompt-mode-scroll::-webkit-scrollbar,
+    .prompt-chip-grid::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .prompt-mode-scroll::-webkit-scrollbar-thumb,
+    .prompt-chip-grid::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
     .scene-panel {
       flex: 1;
       min-height: 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     .scene-panel-head {
       display: flex;
@@ -672,14 +708,18 @@
     }
     .scene-preset-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: 6px;
-      max-height: 210px;
+      max-height: 102px;
       overflow-y: auto;
       padding-right: 2px;
     }
-    .scene-preset-grid::-webkit-scrollbar { width: 4px; }
-    .scene-preset-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .prompt-chip-grid {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+    }
     .scene-card {
       text-align: left;
       background: var(--field);
@@ -687,8 +727,8 @@
       border-radius: 7px;
       color: var(--text);
       cursor: pointer;
-      min-height: 48px;
-      padding: 7px 8px;
+      min-height: 42px;
+      padding: 6px 7px;
       font-family: inherit;
       transition: border-color .15s, background .15s, transform .15s;
     }
@@ -704,22 +744,26 @@
     }
     .scene-card-name {
       display: block;
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       font-weight: 700;
       line-height: 1.25;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .scene-card-meta {
       display: block;
-      font-size: 0.64rem;
+      font-size: 0.6rem;
       color: var(--muted);
-      line-height: 1.3;
+      line-height: 1.2;
     }
     .scene-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
+    }
+    .prompt-compact-row {
+      flex: 0 0 auto;
+      min-height: 0;
     }
     .scene-status {
       flex: 1;
@@ -729,13 +773,15 @@
       color: var(--muted);
     }
     .advanced-panel {
-      padding: 10px;
+      flex: 0 0 auto;
+      padding: 8px 9px;
       border: 1px solid var(--border);
       border-radius: 7px;
       background: var(--surface2);
       color: var(--muted);
-      font-size: .74rem;
-      line-height: 1.5;
+      font-size: .7rem;
+      line-height: 1.38;
+      max-height: 62px;
       overflow: auto;
     }
     .advanced-panel strong { color: var(--text); }
@@ -746,10 +792,10 @@
     }
     .mode-preset-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
       gap: 6px;
       overflow: auto;
-      max-height: 132px;
+      max-height: 96px;
       padding-right: 2px;
     }
     .mode-preset-btn {
@@ -760,9 +806,10 @@
       color: var(--text);
       cursor: pointer;
       font: inherit;
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 700;
-      padding: 7px 8px;
+      min-height: 32px;
+      padding: 6px 7px;
     }
     .mode-preset-btn:hover {
       border-color: var(--accent);
@@ -1019,7 +1066,7 @@
     .fps-bad  { color: #C97064; }
 
     /*  Mode toggle  */
-    .mode-toggle { display: flex; gap: 4px; margin-bottom: 8px; flex-shrink: 0; }
+    .mode-toggle { display: flex; gap: 4px; flex-shrink: 0; }
     .mode-btn {
       flex: 1; padding: 6px 8px; font-size: 0.75rem; font-weight: 600; font-family: inherit;
       border-radius: 6px; border: 1px solid var(--border); background: var(--surface2);
@@ -1029,7 +1076,13 @@
     .mode-btn.active { background: rgba(63,108,81,0.22); border-color: var(--accent); color: var(--text); }
 
     /*  Intensity slider  */
-    .intensity-row { flex-shrink: 0; margin-bottom: 8px; }
+    .intensity-row {
+      flex-shrink: 0;
+      padding: 8px 9px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface2);
+    }
     .intensity-label {
       display: flex; justify-content: space-between;
       font-size: 0.7rem; font-weight: 700; color: var(--muted);
@@ -1419,10 +1472,10 @@
     </div>
 
     <!-- Controls card -->
-    <div class="card controls-card">
+    <div class="card controls-card prompt-card">
       <div class="card-title">Prompt</div>
 
-      <div class="workspace-tabs" id="workspace-tabs" aria-label="Workspace modes">
+      <div class="workspace-tabs prompt-mode-tabs" id="workspace-tabs" aria-label="Workspace modes">
         <button class="workspace-tab active" type="button" data-panel="workspace">Workspace</button>
         <button class="workspace-tab" type="button" data-panel="scenes">Scenes</button>
         <button class="workspace-tab" type="button" data-panel="background">Background</button>
@@ -1430,7 +1483,8 @@
         <button class="workspace-tab" type="button" data-panel="advanced">Advanced</button>
       </div>
 
-      <div class="utility-panel active" data-panel="workspace">
+      <div class="prompt-mode-body">
+      <div class="utility-panel prompt-mode-scroll active" data-panel="workspace">
         <!-- Mode toggle -->
         <div class="mode-toggle" id="mode-toggle">
           <button class="mode-btn active" data-mode="face"       id="mode-face">Face Swap</button>
@@ -1460,7 +1514,7 @@
         </div>
       </div>
 
-      <div class="utility-panel" data-panel="scenes">
+      <div class="utility-panel prompt-mode-scroll" data-panel="scenes">
         <!-- Scene/background presets -->
         <div class="scene-panel" id="scene-panel">
           <div class="scene-panel-head">
@@ -1469,19 +1523,19 @@
               <span id="scene-state" class="scene-state">No scene selected</span>
             </div>
           </div>
-          <div id="scene-preset-grid" class="scene-preset-grid" aria-label="Scene presets"></div>
-          <div class="scene-actions">
+          <div id="scene-preset-grid" class="scene-preset-grid prompt-chip-grid" aria-label="Scene presets"></div>
+          <div class="scene-actions prompt-compact-row">
             <span id="scene-status" class="scene-status">Select a scene for this or the next session.</span>
           </div>
         </div>
       </div>
 
-      <div class="utility-panel" data-panel="background">
-        <div class="advanced-panel">
+      <div class="utility-panel prompt-mode-scroll" data-panel="background">
+        <div class="advanced-panel prompt-compact-row">
           <strong>Background</strong><br>
           Change only the environment behind the person. Identity, face, and outfit should stay stable.
         </div>
-        <div class="mode-preset-grid" aria-label="Background presets">
+        <div class="mode-preset-grid prompt-chip-grid" aria-label="Background presets">
           <button class="mode-preset-btn" type="button" data-mode-preset="background" data-prompt="Replace only the background with a clean modern office. Preserve the person, face, body, outfit, and pose.">Modern Office</button>
           <button class="mode-preset-btn" type="button" data-mode-preset="background" data-prompt="Replace only the background with a warm podcast studio. Preserve the person, face, body, outfit, and pose.">Podcast Room</button>
           <button class="mode-preset-btn" type="button" data-mode-preset="background" data-prompt="Replace only the background with a soft outdoor park. Preserve the person, face, body, outfit, and pose.">Outdoor Park</button>
@@ -1489,12 +1543,12 @@
         </div>
       </div>
 
-      <div class="utility-panel" data-panel="style">
-        <div class="advanced-panel">
+      <div class="utility-panel prompt-mode-scroll" data-panel="style">
+        <div class="advanced-panel prompt-compact-row">
           <strong>Style</strong><br>
           Adjust the visual look without changing identity, face, outfit, or body shape.
         </div>
-        <div class="mode-preset-grid" aria-label="Style presets">
+        <div class="mode-preset-grid prompt-chip-grid" aria-label="Style presets">
           <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply cinematic realistic lighting and color while preserving the person, face, outfit, and identity.">Cinematic</button>
           <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply soft studio lighting and natural color while preserving the person, face, outfit, and identity.">Soft Lighting</button>
           <button class="mode-preset-btn" type="button" data-mode-preset="style" data-prompt="Apply high contrast editorial lighting while preserving the person, face, outfit, and identity.">High Contrast</button>
@@ -1502,8 +1556,8 @@
         </div>
       </div>
 
-      <div class="utility-panel" data-panel="advanced">
-        <div class="advanced-panel">
+      <div class="utility-panel prompt-mode-scroll" data-panel="advanced">
+        <div class="advanced-panel prompt-compact-row">
           <strong>Advanced workspace</strong><br>
           Local diagnostics and scene metadata appear here without changing billing, auth, or Decart routing.
         </div>
@@ -1514,6 +1568,7 @@
           <input type="range" id="intensity-slider" min="0" max="100" value="100" step="5" class="intensity-slider">
           <div class="intensity-hints"><span>Subtle</span><span>Natural</span><span>Full</span></div>
         </div>
+      </div>
       </div>
     </div>
 
