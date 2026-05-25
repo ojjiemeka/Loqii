@@ -11,6 +11,7 @@ This repository is for the desktop application only. The production server/admin
 
 ```bash
 npm install
+npm run build
 npm run electron:dev
 ```
 

@@ -10,7 +10,7 @@
     "build": "node build.js",
     "start": "node build.js && node server.mjs",
     "electron": "node build.js && electron .",
-    "electron:dev": "node_modules\\.bin\\electron.cmd . --dev",
+    "electron:dev": "node build.js && node_modules\\.bin\\electron.cmd . --dev",
     "pack": "node build.js && electron-builder --dir",
     "dist": "node build.js && electron-builder",
     "dist:win": "node build.js && electron-builder --win",
