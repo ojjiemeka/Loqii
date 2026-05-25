@@ -2733,13 +2733,13 @@ async function getAPIToken() {
 
       if (window.tzurah.getAccessToken) {
         accessToken = await window.tzurah.getAccessToken();
-        console.log("[TOKEN] From getAccessToken:", accessToken ? accessToken.substring(0, 20) + "..." : "null");
+        console.log("[TOKEN] From getAccessToken:", accessToken ? "present" : "null");
       }
 
       if (!accessToken) {
         const session = await window.tzurah.getSession();
         accessToken = session?.access_token;
-        console.log("[TOKEN] From getSession fallback:", accessToken ? accessToken.substring(0, 20) + "..." : "null");
+        console.log("[TOKEN] From getSession fallback:", accessToken ? "present" : "null");
       }
 
       if (!accessToken) throw new Error("No access token â€” please log in again");

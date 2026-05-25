@@ -758,7 +758,7 @@ ipcMain.handle("auth:getSession", () => {
 ipcMain.handle("auth:getAccessToken", async () => {
   try {
     const token = await getFreshAccessToken();
-    console.log("[IPC] getAccessToken:", token ? token.substring(0, 20) + "..." : "NULL");
+    console.log("[IPC] getAccessToken:", token ? "present" : "NULL");
     return token;
   } catch (err) {
     console.error("[IPC] getAccessToken failed:", err.message);
@@ -810,7 +810,7 @@ ipcMain.handle("credits:deduct", async (_e, credits, seconds, metadata = null) =
       return { remaining: localBalance };
     }
 
-    console.log("[DEDUCT] Syncing to server â€” credits:", credits, "seconds:", seconds, "token prefix:", accessToken.slice(0, 20));
+    console.log("[DEDUCT] Syncing to server — credits:", credits, "seconds:", seconds, "token:", accessToken ? "present" : "missing");
 
     const local = db.getSession();
     const billingMetadata = metadata && typeof metadata === "object" ? metadata : {};
