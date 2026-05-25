@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loqii — Sign In</title>
+  <style>
+    :root {
+      --bg:      #0a0a0f;
+      --surface: #111118;
+      --border:  #252535;
+      --text:    #e4e2ef;
+      --muted:   #5a5a72;
+      --accent:  #8b5cf6;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --radius:  10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    /* ── Titlebar ── */
+    .titlebar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 12px;
+      gap: 8px;
+      -webkit-app-region: drag;
+    }
+    .win-btn {
+      -webkit-app-region: no-drag;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: none; cursor: pointer;
+      opacity: .7; transition: opacity .15s;
+    }
+    .win-btn:hover { opacity: 1; }
+    .win-close { background: #ef4444; }
+    .win-min   { background: #f59e0b; }
+
+    /* ── Layout ── */
+    .page {
+      -webkit-app-region: no-drag;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px 20px;
+      gap: 22px;
+    }
+
+    /* ── Brand ── */
+    .brand { text-align: center; }
+    .brand-logo {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #6d28d9);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 14px;
+      box-shadow: 0 0 36px rgba(139,92,246,.3);
+    }
+    .brand-title {
+      font-size: 1.45rem; font-weight: 800; letter-spacing: -0.03em;
+    }
+    .brand-title span { color: var(--accent); }
+    .brand-sub { margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+
+    /* ── Card ── */
+    .card {
+      width: 100%; max-width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 22px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ── Google button ── */
+    .btn-google {
+      width: 100%; padding: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.88rem; font-weight: 600; font-family: inherit;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .btn-google:hover { border-color: #444460; background: #13131f; }
+    .btn-google svg { flex-shrink: 0; }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.72rem; color: var(--muted);
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1;
+      height: 1px; background: var(--border);
+    }
+
+    /* ── Fields ── */
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+    .field input {
+      width: 100%; padding: 9px 12px;
+      font-size: 0.88rem; font-family: inherit;
+      background: var(--bg);
+      border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text); outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field input.err   { border-color: var(--red); }
+
+    /* ── Primary button ── */
+    .btn-primary {
+      width: 100%; padding: 10px;
+      font-size: 0.9rem; font-weight: 700; font-family: inherit;
+      border: none; border-radius: 7px;
+      background: linear-gradient(135deg, var(--accent), #6d28d9);
+      color: #fff; cursor: pointer;
+      transition: filter .15s, box-shadow .15s;
+    }
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 0 18px rgba(139,92,246,.4);
+    }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+    .spinner {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Messages ── */
+    .msg {
+      font-size: 0.78rem; border-radius: 6px; padding: 8px 11px; display: none;
+    }
+    .msg.error   { display: block; background: rgba(239,68,68,.1); color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
+    .msg.success { display: block; background: rgba(34,197,94,.09); color: #86efac; border: 1px solid rgba(34,197,94,.25); }
+
+    /* ── Footer ── */
+    .footer { font-size: 0.75rem; color: var(--muted); text-align: center; }
+    .footer a { color: var(--accent); text-decoration: none; cursor: pointer; }
+    .footer a:hover { text-decoration: underline; }
+
+    /* ── Dev bypass — remove before shipping ── */
+    .dev-skip { display: none; font-size: 0.68rem; color: #f59e0b; text-align: center; }
+    .dev-skip a {
+      color: #f59e0b; text-decoration: none;
+      border: 1px solid rgba(245,158,11,.3);
+      border-radius: 4px; padding: 2px 9px;
+    }
+    .dev-skip a:hover { background: rgba(245,158,11,.1); }
+  </style>
+</head>
+<body>
+
+<div class="titlebar">
+  <button class="win-btn win-min"   id="btn-min"   title="Minimise"></button>
+  <button class="win-btn win-close" id="btn-close" title="Close"></button>
+</div>
+
+<div class="page">
+
+  <div class="brand">
+    <div class="brand-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+        <circle cx="9"  cy="10" r="1" fill="#fff" stroke="none"/>
+        <circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/>
+      </svg>
+    </div>
+    <div class="brand-title"><span>Loqii</span></div>
+    <div style="font-size:.72rem;color:var(--muted);margin-top:4px">by Tzurah</div>
+    <div class="brand-sub">Real-time AI Face Swap</div>
+  </div>
+
+  <div class="card">
+
+    <!-- Google OAuth -->
+    <button id="btn-google" class="btn-google">
+      <svg width="18" height="18" viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="divider">or</div>
+
+    <div class="field">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+    </div>
+
+    <div class="field">
+      <label>Password</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <button id="btn-signin" class="btn-primary">Sign In</button>
+
+  </div>
+
+  <div class="footer">
+    Don't have an account? <a id="link-signup">Sign up →</a>
+  </div>
+
+  <!-- DEV BYPASS — remove before shipping -->
+  <div class="dev-skip" id="dev-skip">
+    <a id="link-dev" href="#">⚠ Dev Mode — Skip Login</a>
+  </div>
+
+</div>
+
+<script>
+  const r = window.tzurah;
+
+  // Window chrome
+  document.getElementById("btn-close").addEventListener("click", () => window.close());
+  document.getElementById("btn-min").addEventListener("click", () => {
+    window.blur();
+  });
+
+  // Navigate to signup
+  document.getElementById("link-signup").addEventListener("click", () => {
+    window.location.href = "signup.html";
+  });
+
+  const emailEl    = document.getElementById("email");
+  const passwordEl = document.getElementById("password");
+  const msgEl      = document.getElementById("msg");
+  const btnSignin  = document.getElementById("btn-signin");
+  const btnGoogle  = document.getElementById("btn-google");
+
+  function showMsg(text, type) {
+    msgEl.textContent = text;
+    msgEl.className   = `msg ${type}`;
+  }
+  function clearMsg() { msgEl.className = "msg"; }
+
+  function setBusy(el, busy, label) {
+    el.disabled   = busy;
+    el.innerHTML  = busy ? `<span class="spinner"></span>${label}` : label;
+  }
+
+  // ── Email / password sign-in ─────────────────────────────────────
+  async function doSignIn() {
+    const email    = emailEl.value.trim();
+    const password = passwordEl.value;
+    if (!email || !password) { showMsg("Please enter your email and password.", "error"); return; }
+
+    clearMsg();
+    setBusy(btnSignin, true, "Signing in…");
+
+    const result = await r.login(email, password);
+    if (result.error) {
+      showMsg(result.error, "error");
+      setBusy(btnSignin, false, "Sign In");
+    }
+    // On success, electron.js calls showMainApp() — this window transitions automatically
+  }
+
+  btnSignin.addEventListener("click", doSignIn);
+  passwordEl.addEventListener("keydown", (e) => { if (e.key === "Enter") doSignIn(); });
+
+  // ── Google OAuth ─────────────────────────────────────────────────
+  const GOOGLE_SVG = `<svg width="18" height="18" viewBox="0 0 48 48">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+  </svg>Continue with Google`;
+
+  btnGoogle.addEventListener("click", async () => {
+    clearMsg();
+    setBusy(btnGoogle, true, "Opening Google…");
+    const result = await r.googleAuth();
+    if (result.cancelled) {
+      btnGoogle.disabled  = false;
+      btnGoogle.innerHTML = GOOGLE_SVG;
+    } else if (result.error) {
+      showMsg(result.error, "error");
+      btnGoogle.disabled  = false;
+      btnGoogle.innerHTML = GOOGLE_SVG;
+    }
+    // On success, electron.js calls showMainApp() — window transitions automatically
+  });
+
+  // ── Dev bypass — remove before shipping ─────────────────────────
+  (function () {
+    const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+      || window.location.protocol === "file:";
+    if (!isLocalhost) return;
+    r.appInfo().then((info) => {
+      if (!info?.devBypass) return;
+      const el = document.getElementById("dev-skip");
+      el.style.display = "block";
+      document.getElementById("link-dev").addEventListener("click", (e) => {
+        e.preventDefault();
+        r.devBypass();
+      });
+    });
+  })();
+</script>
+</body>
+</html>

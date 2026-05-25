@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loqii — Create Account</title>
+  <style>
+    :root {
+      --bg:      #0a0a0f;
+      --surface: #111118;
+      --border:  #252535;
+      --text:    #e4e2ef;
+      --muted:   #5a5a72;
+      --accent:  #8b5cf6;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --radius:  10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100vh;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+    .titlebar {
+      position: fixed; top: 0; left: 0; right: 0; height: 32px;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 12px; gap: 8px; -webkit-app-region: drag;
+    }
+    .win-btn {
+      -webkit-app-region: no-drag;
+      width: 12px; height: 12px; border-radius: 50%;
+      border: none; cursor: pointer; opacity: .7; transition: opacity .15s;
+    }
+    .win-btn:hover { opacity: 1; }
+    .win-close { background: #ef4444; }
+    .win-min   { background: #f59e0b; }
+
+    .page {
+      -webkit-app-region: no-drag;
+      height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 32px 24px 20px; gap: 18px;
+      overflow-y: auto;
+    }
+
+    .brand { text-align: center; }
+    .brand-logo {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #6d28d9);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 12px;
+      box-shadow: 0 0 30px rgba(139,92,246,.3);
+    }
+    .brand-title { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.03em; }
+    .brand-title span { color: var(--accent); }
+
+    /* Free credit badge */
+    .free-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.72rem; font-weight: 700;
+      background: rgba(34,197,94,.1);
+      border: 1px solid rgba(34,197,94,.25);
+      color: #86efac;
+      border-radius: 20px; padding: 3px 10px;
+    }
+
+    .card {
+      width: 100%; max-width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 22px 22px; display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .btn-google {
+      width: 100%; padding: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text); font-size: 0.88rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .btn-google:hover { border-color: #444460; background: #13131f; }
+
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.72rem; color: var(--muted);
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+    }
+    .field input {
+      width: 100%; padding: 9px 12px;
+      font-size: 0.88rem; font-family: inherit;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text); outline: none; transition: border-color .15s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field input.err { border-color: var(--red); }
+
+    .btn-primary {
+      width: 100%; padding: 10px;
+      font-size: 0.9rem; font-weight: 700; font-family: inherit;
+      border: none; border-radius: 7px;
+      background: linear-gradient(135deg, var(--accent), #6d28d9);
+      color: #fff; cursor: pointer;
+      transition: filter .15s, box-shadow .15s;
+    }
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 0 18px rgba(139,92,246,.4);
+    }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+    .spinner {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .msg { font-size: 0.78rem; border-radius: 6px; padding: 8px 11px; display: none; }
+    .msg.error   { display: block; background: rgba(239,68,68,.1);  color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
+    .msg.success { display: block; background: rgba(34,197,94,.09); color: #86efac; border: 1px solid rgba(34,197,94,.25); }
+
+    .footer { font-size: 0.75rem; color: var(--muted); text-align: center; }
+    .footer a { color: var(--accent); text-decoration: none; cursor: pointer; }
+    .footer a:hover { text-decoration: underline; }
+
+    .terms {
+      font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.4;
+    }
+    .terms a { color: var(--muted); text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="titlebar">
+  <button class="win-btn win-min"   id="btn-min"   title="Minimise"></button>
+  <button class="win-btn win-close" id="btn-close" title="Close"></button>
+</div>
+
+<div class="page">
+
+  <div class="brand">
+    <div class="brand-logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+        <circle cx="9"  cy="10" r="1" fill="#fff" stroke="none"/>
+        <circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/>
+      </svg>
+    </div>
+    <div class="brand-title"><span>Loqii</span> — Create Account</div>
+    <div style="font-size:.72rem;color:var(--muted);margin-top:4px">by Tzurah</div>
+  </div>
+
+  <div class="free-badge">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    1 minute free on signup
+  </div>
+
+  <div class="card">
+
+    <button id="btn-google" class="btn-google">
+      <svg width="18" height="18" viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="divider">or</div>
+
+    <div class="field">
+      <label>Display Name</label>
+      <input id="name" type="text" placeholder="Your name" autocomplete="name">
+    </div>
+
+    <div class="field">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+    </div>
+
+    <div class="field">
+      <label>Password</label>
+      <input id="password" type="password" placeholder="At least 8 characters" autocomplete="new-password">
+    </div>
+
+    <div class="field">
+      <label>Confirm Password</label>
+      <input id="confirm" type="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <button id="btn-signup" class="btn-primary">Create Account</button>
+
+    <p class="terms">
+      By signing up you agree to our
+      <a id="link-terms" href="#">Terms of Service</a> and
+      <a id="link-privacy" href="#">Privacy Policy</a>.
+    </p>
+
+  </div>
+
+  <div class="footer">
+    Already have an account? <a id="link-login">Sign in →</a>
+  </div>
+
+</div>
+
+<script>
+  const r = window.tzurah;
+
+  document.getElementById("btn-close").addEventListener("click", () => window.close());
+  document.getElementById("btn-min").addEventListener("click",   () => window.blur());
+
+  document.getElementById("link-login").addEventListener("click", () => {
+    window.location.href = "login.html";
+  });
+  document.getElementById("link-terms").addEventListener("click", (e) => {
+    e.preventDefault();
+    r.openExternal("https://tzurah.ai/terms");
+  });
+  document.getElementById("link-privacy").addEventListener("click", (e) => {
+    e.preventDefault();
+    r.openExternal("https://tzurah.ai/privacy");
+  });
+
+  const nameEl     = document.getElementById("name");
+  const emailEl    = document.getElementById("email");
+  const passwordEl = document.getElementById("password");
+  const confirmEl  = document.getElementById("confirm");
+  const msgEl      = document.getElementById("msg");
+  const btnSignup  = document.getElementById("btn-signup");
+  const btnGoogle  = document.getElementById("btn-google");
+
+  function showMsg(text, type) { msgEl.textContent = text; msgEl.className = `msg ${type}`; }
+  function clearMsg()          { msgEl.className = "msg"; }
+
+  function setBusy(el, busy, label) {
+    el.disabled  = busy;
+    el.innerHTML = busy ? `<span class="spinner"></span>${label}` : label;
+  }
+
+  // ── Email sign-up ────────────────────────────────────────────────
+  async function doSignup() {
+    const name     = nameEl.value.trim();
+    const email    = emailEl.value.trim();
+    const password = passwordEl.value;
+    const confirm  = confirmEl.value;
+
+    if (!name)                { showMsg("Please enter your display name.", "error"); return; }
+    if (!email)               { showMsg("Please enter your email.", "error"); return; }
+    if (password.length < 8)  { showMsg("Password must be at least 8 characters.", "error"); return; }
+    if (password !== confirm)  { showMsg("Passwords do not match.", "error"); return; }
+
+    clearMsg();
+    setBusy(btnSignup, true, "Creating account…");
+
+    const result = await r.signup(email, password, name);
+
+    if (result.error) {
+      showMsg(result.error, "error");
+      setBusy(btnSignup, false, "Create Account");
+      return;
+    }
+
+    if (result.confirmRequired) {
+      showMsg("Check your email for a confirmation link, then come back to sign in.", "success");
+      setBusy(btnSignup, false, "Create Account");
+      return;
+    }
+
+    // On success, electron.js calls showMainApp() automatically
+  }
+
+  btnSignup.addEventListener("click", doSignup);
+  confirmEl.addEventListener("keydown", (e) => { if (e.key === "Enter") doSignup(); });
+
+  // ── Google OAuth ─────────────────────────────────────────────────
+  btnGoogle.addEventListener("click", async () => {
+    clearMsg();
+    setBusy(btnGoogle, true, "Opening Google…");
+    const result = await r.googleAuth();
+    if (result.error) {
+      showMsg(result.error, "error");
+      btnGoogle.disabled  = false;
+      btnGoogle.innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>Continue with Google`;
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+{
+  "name": "loqii",
+  "version": "1.0.0",
+  "description": "Real-time AI face swap powered by Decart",
+  "main": "electron.js",
+  "author": "Tzurah",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "start": "node build.js && node server.mjs",
+    "electron": "node build.js && electron .",
+    "electron:dev": "node_modules\\.bin\\electron.cmd . --dev",
+    "pack": "node build.js && electron-builder --dir",
+    "dist": "node build.js && electron-builder",
+    "dist:win": "node build.js && electron-builder --win",
+    "server:gcp": "node gcp-server.js"
+  },
+  "dependencies": {
+    "@decartai/sdk": "^0.0.60",
+    "@huggingface/transformers": "^4.1.0",
+    "@supabase/supabase-js": "^2.103.2",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "electron-updater": "^6.8.3",
+    "express": "^4.21.0",
+    "express-basic-auth": "^1.2.1",
+    "express-rate-limit": "^7.5.1",
+    "stripe": "^17.0.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.24.2"
+  },
+  "build": {
+    "appId": "ai.tzurah.loqii",
+    "productName": "Loqii",
+    "copyright": "Copyright © 2025 Tzurah",
+    "protocols": [
+      {
+        "name": "Loqii",
+        "schemes": [
+          "tzurah"
+        ]
+      }
+    ],
+    "files": [
+      "electron.js",
+      "preload.js",
+      "server.mjs",
+      "db.js",
+      "supabase.js",
+      "build.js",
+      "sdk-entry.js",
+      "index.html",
+      "obs.html",
+      "login.html",
+      "signup.html",
+      "topup.html",
+      "dashboard.html",
+      "public/**",
+      "assets/**",
+      "node_modules/**",
+      "!node_modules/.cache/**",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "public",
+        "to": "public"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/Tzurah_logo.png",
+      "artifactName": "Loqii-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Loqii"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "REPLACE_GITHUB_OWNER",
+      "repo": "REPLACE_GITHUB_REPO"
+    }
+  }
+}

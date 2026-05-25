@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loqii — Add Credits</title>
+  <style>
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #111118;
+      --surface2:  #1a1a2e;
+      --border:    #2a2a4a;
+      --text:      #ffffff;
+      --muted:     #888899;
+      --accent:    #6366f1;
+      --accent-glow: rgba(99,102,241,0.3);
+      --secondary: #8b5cf6;
+      --electric:  #06b6d4;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --orange:    #f59e0b;
+      --radius:    10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100vh;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px; overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    .titlebar {
+      position: fixed; top: 0; left: 0; right: 0; height: 36px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px; -webkit-app-region: drag;
+      border-bottom: 1px solid var(--border);
+    }
+    .titlebar-label {
+      font-size: 0.75rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    .win-btn {
+      -webkit-app-region: no-drag;
+      width: 12px; height: 12px; border-radius: 50%;
+      border: none; cursor: pointer; opacity: .7; transition: opacity .15s;
+    }
+    .win-btn:hover { opacity: 1; }
+    .win-close { background: var(--red); }
+
+    .page {
+      -webkit-app-region: no-drag;
+      margin-top: 36px;
+      height: calc(100vh - 36px);
+      overflow-y: auto;
+      padding: 20px 24px 32px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    .page::-webkit-scrollbar { width: 4px; }
+    .page::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Balance banner ── */
+    .balance-banner {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .balance-left { display: flex; flex-direction: column; gap: 3px; }
+    .balance-label {
+      font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+    }
+    .balance-value {
+      font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em;
+      color: var(--green);
+    }
+    .balance-value.low    { color: var(--orange); }
+    .balance-value.empty  { color: var(--red); }
+    .balance-time { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── Section ── */
+    .section-title {
+      font-size: 0.62rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Pack grid ── */
+    .packs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+    .pack-card {
+      background: var(--surface); border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      cursor: pointer; position: relative;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+      user-select: none;
+    }
+    .pack-card:hover    { border-color: rgba(99,102,241,.5); background: rgba(99,102,241,.04); }
+    .pack-card.selected {
+      border-color: var(--accent);
+      background: rgba(99,102,241,.08);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .pack-card.popular  { border-color: rgba(99,102,241,.4); }
+    .popular-badge {
+      position: absolute; top: -1px; right: 10px;
+      font-size: 0.58rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      background: var(--accent); color: #fff;
+      border-radius: 0 0 5px 5px;
+      padding: 2px 7px;
+    }
+    .pack-name {
+      font-size: 0.75rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .pack-time {
+      font-size: 1.25rem; font-weight: 800; letter-spacing: -0.03em;
+    }
+    .pack-time span { font-size: 0.72rem; font-weight: 500; color: var(--muted); }
+    .pack-credits { font-size: 0.72rem; color: var(--muted); }
+    .pack-price {
+      font-size: 0.95rem; font-weight: 700; color: var(--accent);
+      margin-top: 2px;
+    }
+    .pack-per { font-size: 0.65rem; color: var(--muted); }
+
+    /* ── Checkout button ── */
+    .btn-checkout {
+      width: 100%; padding: 13px;
+      font-size: 0.9rem; font-weight: 700; font-family: inherit;
+      border: none; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--secondary));
+      color: #fff; cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .btn-checkout:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .btn-checkout:disabled { opacity: .4; cursor: not-allowed; }
+
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .err-msg {
+      display: none; font-size: 0.78rem;
+      background: rgba(239,68,68,.1); color: #fca5a5;
+      border: 1px solid rgba(239,68,68,.25);
+      border-radius: 6px; padding: 9px 12px;
+    }
+    .err-msg.visible { display: block; }
+
+    .note {
+      font-size: 0.72rem; color: var(--muted);
+      text-align: center; line-height: 1.5;
+    }
+    .note a { color: var(--accent); text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+
+    /* ── Mock mode ── */
+    .mock-banner {
+      display: none; padding: 9px 14px; border-radius: 8px;
+      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.4);
+      color: var(--orange); font-size: 0.78rem; font-weight: 600;
+      text-align: center; line-height: 1.4;
+    }
+    .mock-banner.visible { display: block; }
+    .btn-mock {
+      width: 100%; margin-top: 6px; padding: 7px;
+      font-size: 0.75rem; font-weight: 700; font-family: inherit;
+      border-radius: 6px; cursor: pointer;
+      background: rgba(245,158,11,.15); color: var(--orange);
+      border: 1px solid rgba(245,158,11,.4);
+      transition: all .15s;
+    }
+    .btn-mock:hover:not(:disabled) { background: rgba(245,158,11,.28); }
+    .btn-mock:disabled { opacity: .4; cursor: not-allowed; }
+    .success-msg {
+      display: none; padding: 10px 14px; border-radius: 8px;
+      background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3);
+      color: var(--green); font-size: 0.82rem; font-weight: 600; text-align: center;
+    }
+    .success-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="titlebar">
+  <span class="titlebar-label">Add Credits</span>
+  <button class="win-btn win-close" id="btn-close"></button>
+</div>
+
+<div class="page">
+
+  <!-- Mock mode banner -->
+  <div class="mock-banner" id="mock-banner">
+    🧪 TEST MODE — Mock Payments Active<br>
+    <small style="font-weight:400;font-size:0.72rem">Credits are added instantly without real payment. Disable in Admin → Flags before going live.</small>
+  </div>
+
+  <!-- Current balance -->
+  <div class="balance-banner">
+    <div class="balance-left">
+      <div class="balance-label">Credits Remaining</div>
+      <div class="balance-value" id="balance-val">—</div>
+      <div class="balance-time" id="balance-time"></div>
+    </div>
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,.4)" stroke-width="1.4">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 6v6l4 2"/>
+    </svg>
+  </div>
+
+  <!-- Pack grid -->
+  <div>
+    <div class="section-title">Choose a credit pack</div>
+    <div class="packs" id="packs"></div>
+  </div>
+
+  <div class="success-msg" id="success-msg"></div>
+  <div class="err-msg" id="err-msg"></div>
+
+  <button class="btn-checkout" id="btn-checkout" disabled>
+    Select a pack to continue
+  </button>
+
+  <div class="note">
+    Payments are processed securely via Stripe.<br>
+    Credits are added to your account within seconds of payment.<br>
+    Credits never expire.<br><br>
+    Need help? <a id="link-support" href="#">Contact support</a>
+  </div>
+
+</div>
+
+<script>
+  const r = window.tzurah;
+  const GCP = "http://34.39.83.195:4000";
+
+  document.getElementById("btn-close").addEventListener("click", () => window.close());
+  document.getElementById("link-support").addEventListener("click", (e) => {
+    e.preventDefault();
+    r.openExternal("mailto:support@tzurah.ai");
+  });
+
+  // 2.18 cr/sec = 130.8 cr/min
+  function creditsToTime(c) {
+    const totalSec = Math.round(c / 2.18);
+    const m = Math.floor(totalSec / 60), s = totalSec % 60;
+    if (m >= 60) return `${Math.floor(m/60)}h ${m%60}m`;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  let allPacks    = [];
+  let selectedPack = null;
+  let mockMode    = false;
+
+  async function init() {
+    await Promise.all([loadFlags(), loadPacks(), loadBalance()]);
+  }
+
+  async function loadFlags() {
+    try {
+      const res = await fetch(`${GCP}/api/feature-flags`);
+      const flags = await res.json();
+      mockMode = !!flags.mock_payments;
+      if (mockMode) document.getElementById("mock-banner").classList.add("visible");
+    } catch (_) {}
+  }
+
+  async function loadPacks() {
+    try {
+      const res = await fetch(`${GCP}/api/credit-packs`);
+      const data = await res.json();
+      allPacks = data.packs || [];
+    } catch (_) {
+      // Fallback: hardcoded packs if server unreachable
+      allPacks = [
+        { id: "starter",  name: "Starter",  price_usd: 20,  credits: 42,   is_popular: false },
+        { id: "basic",    name: "Basic",    price_usd: 35,  credits: 72,   is_popular: false },
+        { id: "standard", name: "Standard", price_usd: 60,  credits: 132,  is_popular: true  },
+        { id: "pro",      name: "Pro",      price_usd: 100, credits: 216,  is_popular: false },
+        { id: "ultra",    name: "Ultra",    price_usd: 200, credits: 450,  is_popular: false },
+        { id: "max",      name: "Max",      price_usd: 500, credits: 1200, is_popular: false },
+      ];
+    }
+    renderPacks();
+  }
+
+  function renderPacks() {
+    const container = document.getElementById("packs");
+    container.innerHTML = "";
+    allPacks.forEach((pack) => {
+      const mins   = Math.round(pack.credits / 130.8);
+      const perMin = mins > 0 ? (pack.price_usd / mins).toFixed(2) : "—";
+      const card   = document.createElement("div");
+      card.className = "pack-card" + (pack.is_popular ? " popular" : "");
+      card.dataset.id = pack.id;
+      card.innerHTML = `
+        ${pack.is_popular ? '<div class="popular-badge">Popular</div>' : ""}
+        <div class="pack-name">${pack.name}</div>
+        <div class="pack-time">${mins}<span> min</span></div>
+        <div class="pack-credits">${pack.credits} credits</div>
+        <div class="pack-price">$${pack.price_usd}</div>
+        <div class="pack-per">$${perMin}/min</div>
+        ${mockMode ? `<button class="btn-mock" data-pack-id="${pack.id}">🧪 Mock Buy</button>` : ""}
+      `;
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".btn-mock")) return;
+        selectPack(pack, card);
+      });
+      if (mockMode) {
+        card.querySelector(".btn-mock")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          doMockBuy(pack);
+        });
+      }
+      container.appendChild(card);
+    });
+  }
+
+  function selectPack(pack, cardEl) {
+    selectedPack = pack;
+    document.querySelectorAll(".pack-card").forEach((c) =>
+      c.classList.toggle("selected", c === cardEl)
+    );
+    const btn = document.getElementById("btn-checkout");
+    btn.disabled = false;
+    const mins = Math.round(pack.credits / 130.8);
+    btn.textContent = `Pay $${pack.price_usd} — ${pack.credits} credits (${mins} min)`;
+  }
+
+  async function doMockBuy(pack) {
+    const successEl = document.getElementById("success-msg");
+    const errEl     = document.getElementById("err-msg");
+    successEl.className = "success-msg";
+    errEl.className     = "err-msg";
+
+    // Disable all mock buttons
+    document.querySelectorAll(".btn-mock").forEach(b => b.disabled = true);
+
+    const result = await r.mockPurchase(pack.id);
+    document.querySelectorAll(".btn-mock").forEach(b => b.disabled = false);
+
+    if (result.error) {
+      errEl.textContent = result.error;
+      errEl.className   = "err-msg visible";
+      return;
+    }
+
+    successEl.textContent = `✅ Purchase successful! +${result.credits_added} credits added.`;
+    successEl.className   = "success-msg visible";
+    selectedPack = null;
+    document.querySelectorAll(".pack-card").forEach(c => c.classList.remove("selected"));
+    document.getElementById("btn-checkout").disabled = true;
+    document.getElementById("btn-checkout").textContent = "Select a pack to continue";
+    loadBalance();
+    setTimeout(() => window.close(), 2000);
+  }
+
+  async function loadBalance() {
+    try {
+      const { credits } = await r.getBalance();
+      updateBalanceUI(credits);
+    } catch (_) {}
+  }
+
+  function updateBalanceUI(credits) {
+    const el   = document.getElementById("balance-val");
+    const time = document.getElementById("balance-time");
+    el.textContent   = credits.toLocaleString();
+    time.textContent = `≈ ${creditsToTime(credits)} remaining`;
+    el.className = "balance-value" + (credits <= 0 ? " empty" : credits < 20 ? " low" : "");
+  }
+
+  r.on("credits:updated", (c) => updateBalanceUI(c));
+  r.on("payment:success", () => {
+    loadBalance();
+    document.getElementById("err-msg").className = "err-msg";
+    document.getElementById("btn-checkout").disabled = true;
+    document.getElementById("btn-checkout").textContent = "Select a pack to continue";
+    selectedPack = null;
+    document.querySelectorAll(".pack-card").forEach(c => c.classList.remove("selected"));
+  });
+
+  document.getElementById("btn-checkout").addEventListener("click", async () => {
+    if (!selectedPack) return;
+    const btn = document.getElementById("btn-checkout");
+    const err = document.getElementById("err-msg");
+    err.className = "err-msg";
+    btn.disabled  = true;
+    btn.innerHTML = `<span class="spinner"></span>Opening Stripe…`;
+
+    const result = await r.checkout(selectedPack.id);
+    if (result.error) {
+      err.textContent = result.error;
+      err.className   = "err-msg visible";
+      btn.disabled    = false;
+      const mins = Math.round(selectedPack.credits / 130.8);
+      btn.textContent = `Pay $${selectedPack.price_usd} — ${selectedPack.credits} credits (${mins} min)`;
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>

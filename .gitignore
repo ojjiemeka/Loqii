@@ -1,0 +1,35 @@
+# Secrets and local credentials
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.crt
+
+# Node and Electron build output
+node_modules/
+dist/
+release/
+out/
+build/
+*.log
+logs/
+.cache/
+
+# Local databases and caches
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+
+# Process manager and local runtime files
+.pm2/
+tmp/
+temp/
