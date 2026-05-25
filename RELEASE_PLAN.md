@@ -57,6 +57,9 @@ Approved app source sync files:
 - `package-lock.json`
 - `COMPONENTS.md`
 - `RELEASE_PLAN.md`
+- `PRODUCT_ROADMAP.md`
+- app UX Lego modules: `loqiiModal.js`, `loqiiDrawer.js`, `loqiiToast.js`, `loqiiTheme.js`, `loqiiHelp.js`
+- realtime Lego modules: `sessionState.js`, `sessionIndicators.js`, `statusBanner.js`, `promptComposer.js`, `scenes.js`, `styles.js`, `performanceMonitor.js`, `errorBoundary.js`, `reconnectManager.js`, `settingsArchitecture.js`
 - `assets/icon.ico`
 - `assets/tray-icon.png`
 - `assets/Tzurah_logo.png`
@@ -150,6 +153,8 @@ Future option:
 ## Preconditions Before Shipping `.exe`
 
 - App login, credits, Decart token, and start/stop lifecycle verified.
+- Google OAuth verified through system-browser deep link without duplicate Electron windows, or disabled by app feature flag.
+- Help, onboarding, diagnostics, scene/style engines, light mode, mock payments, and developer tools verified behind admin-controlled app flags.
 - Billing reconciliation dashboard healthy or degraded only with understood resolved historical events.
 - Normal users proven to route to production Decart.
 - Dev/test users proven to route to dev Decart only when explicitly allowed.

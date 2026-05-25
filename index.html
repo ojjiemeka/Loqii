@@ -12,6 +12,16 @@
       --loqii-coral: #C97064;
       --loqii-green: #3F6C51;
       --loqii-muted: #606D5D;
+      --app-bg: var(--bg);
+      --surface-elevated: var(--surface);
+      --surface-muted: var(--surface2);
+      --text-primary: var(--text);
+      --text-secondary: var(--muted);
+      --text-muted: var(--muted);
+      --text-danger: var(--loqii-coral);
+      --text-success: var(--loqii-green);
+      --accent-primary: var(--loqii-green);
+      --accent-danger: var(--loqii-coral);
       --radius: 8px;
     }
 
@@ -1462,6 +1472,8 @@
     <button id="btn-portrait" class="btn-hdr-ghost" type="button" title="Toggle Portrait/Landscape mode">Landscape</button>
     <button id="btn-record"   class="btn-hdr-ghost btn-hdr-record" type="button" disabled>Record</button>
     <button id="btn-topup-hdr"     class="btn-hdr-accent" type="button">Top-up</button>
+    <button id="btn-settings-hdr"  class="btn-hdr-ghost"  type="button">Settings</button>
+    <button id="btn-help-hdr"      class="btn-hdr-ghost"  type="button">Help</button>
     <button id="btn-dashboard-hdr" class="btn-hdr-ghost"  type="button">Account</button>
   </div>
 
@@ -1621,7 +1633,6 @@
         <button class="workspace-tab" type="button" data-panel="scenes">Scenes</button>
         <button class="workspace-tab" type="button" data-panel="background">Background</button>
         <button class="workspace-tab" type="button" data-panel="style">Style</button>
-        <button class="workspace-tab" type="button" data-panel="advanced">Advanced</button>
       </div>
 
       <div class="prompt-mode-body">
@@ -1698,22 +1709,6 @@
         </div>
       </div>
 
-      <div class="utility-panel prompt-mode-scroll" data-panel="advanced">
-        <div class="advanced-panel prompt-compact-row">
-          <strong>Advanced workspace</strong><br>
-          Local diagnostics and scene metadata appear here without changing billing, auth, or Decart routing.
-        </div>
-        <div class="intensity-row">
-          <label class="intensity-label">
-            Intensity <span id="intensity-value">100%</span>
-          </label>
-          <input type="range" id="intensity-slider" min="0" max="100" value="100" step="5" class="intensity-slider">
-          <div class="intensity-hints"><span>Subtle</span><span>Natural</span><span>Full</span></div>
-        </div>
-        <div id="performance-grid" class="perf-grid" aria-label="Performance monitor"></div>
-        <pre id="prompt-debug" class="prompt-debug">Prompt debug will appear after Apply Prompt.</pre>
-        <div id="settings-sections" class="scene-filter-row" aria-label="Settings sections"></div>
-      </div>
       </div>
     </div>
 
@@ -1756,69 +1751,26 @@ import { createPerformanceMonitor, formatDuration } from "./performanceMonitor.j
 import { createErrorBoundary } from "./errorBoundary.js";
 import { createReconnectManager } from "./reconnectManager.js";
 import { getSettingsSections } from "./settingsArchitecture.js";
+import { applyLoqiiThemeAliases, getFeatureFlag } from "./loqiiTheme.js";
+import { LoqiiConfirm, LoqiiEmptyState, LoqiiLoadingState, LoqiiModal } from "./loqiiModal.js";
+import { LoqiiDrawer } from "./loqiiDrawer.js";
+import { LoqiiToast } from "./loqiiToast.js";
+import { buildHelpMarkup } from "./loqiiHelp.js";
 
 // Reusable app modal alert component. Keep this isolated so dialog behavior
 // can be debugged independently from streaming/session code.
-function modalEsc(value) {
-  return String(value == null ? "" : value)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-
-function closeAppModal(overlay) {
-  if (!overlay) return;
-  overlay.dispatchEvent(new CustomEvent("modal:closed"));
-  overlay.remove();
-}
-
-function bindAppModalKeyboard(overlay, { cancelable = true } = {}) {
-  const onKey = (event) => {
-    if (!document.body.contains(overlay)) {
-      document.removeEventListener("keydown", onKey);
-      return;
-    }
-    if (event.key === "Escape" && cancelable) {
-      event.preventDefault();
-      overlay.querySelector("[data-modal-cancel]")?.click();
-    } else if (event.key === "Enter" && !event.shiftKey) {
-      if (event.target?.tagName === "TEXTAREA") return;
-      event.preventDefault();
-      overlay.querySelector("[data-modal-confirm]")?.click();
-    }
-  };
-  document.addEventListener("keydown", onKey);
-  overlay.addEventListener("modal:closed", () => document.removeEventListener("keydown", onKey), { once: true });
-}
-
 function showAppModal({ title = "Notice", message = "", input = false, defaultValue = "", confirmLabel = "OK", cancelLabel = "Cancel", cancelable = true, variant = "default" } = {}) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "tz-modal-overlay";
-    overlay.setAttribute("role", "dialog");
-    overlay.setAttribute("aria-modal", "true");
-    overlay.innerHTML = `
-      <div class="tz-modal-card">
-        <div class="tz-modal-title">${modalEsc(title)}</div>
-        <div class="tz-modal-body">
-          <div>${modalEsc(message)}</div>
-          ${input ? `<input class="tz-modal-input" data-modal-input type="text" value="${modalEsc(defaultValue)}">` : ""}
-        </div>
-        <div class="tz-modal-actions">
-          ${cancelable ? `<button class="tz-modal-btn" data-modal-cancel>${modalEsc(cancelLabel)}</button>` : ""}
-          <button class="tz-modal-btn tz-modal-btn-primary ${variant === "danger" ? "tz-modal-btn-danger" : ""}" data-modal-confirm>${modalEsc(confirmLabel)}</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const done = (confirmed) => {
-      const value = input && confirmed ? overlay.querySelector("[data-modal-input]")?.value || "" : null;
-      closeAppModal(overlay);
-      resolve(input ? (confirmed ? value : null) : confirmed);
-    };
-    overlay.querySelector("[data-modal-cancel]")?.addEventListener("click", () => done(false));
-    overlay.querySelector("[data-modal-confirm]")?.addEventListener("click", () => done(true));
-    overlay.addEventListener("click", (event) => { if (event.target === overlay && cancelable) done(false); });
-    bindAppModalKeyboard(overlay, { cancelable });
-    setTimeout(() => overlay.querySelector("[data-modal-input]")?.focus(), 60);
+  const safeMessage = String(message == null ? "" : message)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return LoqiiModal({
+    title,
+    body: `<p>${safeMessage}</p>`,
+    input,
+    defaultValue,
+    confirmLabel,
+    cancelLabel,
+    cancelable,
+    danger: variant === "danger",
   });
 }
 
@@ -1859,6 +1811,8 @@ const hdrCreditsVal  = document.getElementById("hdr-credits-val");
 const hdrCreditsTime = document.getElementById("hdr-credits-time");
 const btnTopupHdr    = document.getElementById("btn-topup-hdr");
 const btnDashHdr     = document.getElementById("btn-dashboard-hdr");
+const btnSettingsHdr = document.getElementById("btn-settings-hdr");
+const btnHelpHdr     = document.getElementById("btn-help-hdr");
 const cameraBar      = document.getElementById("camera-bar");
 const webcamSelect   = document.getElementById("webcam-select");
 // Identity slots DOM
@@ -1883,9 +1837,9 @@ const sceneFavoritesFilter = document.getElementById("scene-favorites-filter");
 const btnSceneApply   = document.getElementById("btn-scene-apply");
 const btnSceneReset   = document.getElementById("btn-scene-reset");
 const stylePresetGrid = document.getElementById("style-preset-grid");
-const performanceGrid = document.getElementById("performance-grid");
-const promptDebugEl   = document.getElementById("prompt-debug");
-const settingsSectionsEl = document.getElementById("settings-sections");
+let performanceGrid = document.getElementById("performance-grid");
+let promptDebugEl   = document.getElementById("prompt-debug");
+let settingsSectionsEl = document.getElementById("settings-sections");
 const workspaceTabs   = document.querySelectorAll(".workspace-tab");
 const utilityPanels   = document.querySelectorAll(".utility-panel");
 const bottomRowEl     = document.querySelector(".bottom-row");
@@ -1903,9 +1857,43 @@ window._featureFlags = {};
 window._creditPacks  = [];
 window._burnRate     = 2.18;
 
+const APP_FLAG_DEFAULTS = {
+  show_onboarding: true,
+  onboarding_dev_only: false,
+  onboarding_required: false,
+  enable_google_oauth: false,
+  enable_scene_engine: true,
+  enable_style_engine: true,
+  enable_new_modals: true,
+  enable_advanced_diagnostics: true,
+  enable_help_center: true,
+  enable_mock_payments: false,
+  enable_dev_tools: false,
+  enable_light_mode: true,
+  enable_performance_metrics: true,
+};
+
+function normalizeAppFeatureFlags(flags = {}) {
+  return {
+    ...APP_FLAG_DEFAULTS,
+    ...flags,
+    enable_mock_payments: flags.enable_mock_payments ?? flags.mock_payments ?? APP_FLAG_DEFAULTS.enable_mock_payments,
+  };
+}
+
+function applyAppFeatureFlags(flags = {}) {
+  window._featureFlags = normalizeAppFeatureFlags(flags);
+  if (btnHelpHdr) btnHelpHdr.style.display = getFeatureFlag(window._featureFlags, "enable_help_center", true) ? "" : "none";
+  if (btnSettingsHdr) btnSettingsHdr.style.display = getFeatureFlag(window._featureFlags, "enable_advanced_diagnostics", true) ? "" : "none";
+  if (document.body) {
+    document.body.dataset.devTools = getFeatureFlag(window._featureFlags, "enable_dev_tools", false) ? "1" : "0";
+  }
+}
+
 function setLoqiiTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
   document.body.dataset.theme = nextTheme;
+  applyLoqiiThemeAliases();
   try { localStorage.setItem("loqii-theme", nextTheme); } catch {}
   themeButtons.forEach((btn) => {
     const isActive = btn.dataset.themeChoice === nextTheme;
@@ -1998,7 +1986,7 @@ async function bootstrapApp() {
   }
   // Apply config
   GCP_SERVER_URL            = config.gcp_server_url;
-  window._featureFlags      = config.feature_flags      || {};
+  applyAppFeatureFlags(config.feature_flags || {});
   window._creditPacks       = config.credit_packs       || [];
   window._burnRate          = config.burn_rate          || 2.18;
   window._freeCreditsSignup = config.free_credits_on_signup || 6;
@@ -2037,7 +2025,9 @@ if (!ok) return; // error overlay shown - do nothing further
     if (window._featureFlags?.mock_payments === true) { openMockTopupModal(); return; }
     window.tzurah.openTopup();
   });
-  btnDashHdr.addEventListener("click",  () => window.tzurah.openDashboard());
+  btnDashHdr.addEventListener("click",  openAccountDrawer);
+  btnSettingsHdr?.addEventListener("click", openSettingsDrawer);
+  btnHelpHdr?.addEventListener("click", openHelpDrawer);
 
   // Window controls
   document.getElementById("window-controls").style.display = "flex";
@@ -2266,6 +2256,7 @@ const reconnectManager = createReconnectManager({
 });
 
 function renderPerformanceSnapshot() {
+  performanceGrid = document.getElementById("performance-grid");
   if (!performanceGrid) return;
   const perf = perfMonitor.getSnapshot();
   const reconnect = reconnectManager.getSnapshot();
@@ -2284,6 +2275,7 @@ function renderPerformanceSnapshot() {
 }
 
 function updatePromptDebug(snapshot) {
+  promptDebugEl = document.getElementById("prompt-debug");
   if (!promptDebugEl || !snapshot) return;
   promptDebugEl.textContent = [
     `Layers: ${snapshot.activeLayers.join(", ") || "none"}`,
@@ -2311,6 +2303,78 @@ function renderSettingsSections() {
 }
 renderSettingsSections();
 setInterval(renderPerformanceSnapshot, 1000);
+
+function buildAdvancedDrawerMarkup() {
+  const perf = performanceGrid?.outerHTML || `<div id="performance-grid" class="perf-grid" aria-label="Performance monitor"></div>`;
+  const debug = promptDebugEl?.outerHTML || `<pre id="prompt-debug" class="prompt-debug">Prompt debug will appear after Apply Prompt.</pre>`;
+  return `
+    <section class="loqii-section">
+      <div class="loqii-section-title">Intensity</div>
+      <div class="intensity-row">
+        <label class="intensity-label">Intensity <span id="intensity-value">${currentIntensity || 100}% - ${intensityLabel(currentIntensity || 100)}</span></label>
+        <input type="range" id="intensity-slider" min="0" max="100" value="${currentIntensity || 100}" step="5" class="intensity-slider">
+        <div class="intensity-hints"><span>Subtle</span><span>Natural</span><span>Full</span></div>
+      </div>
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Performance</div>
+      ${perf}
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Prompt Debug</div>
+      ${debug}
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Settings Architecture</div>
+      <div id="settings-sections" class="scene-filter-row" aria-label="Settings sections"></div>
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Session Debug</div>
+      <div class="loqii-section-copy">Decart environment: ${window._lastDecartEnvironmentUsed || "unknown"}<br>Reason: ${window._lastDecartReason || "none"}</div>
+    </section>`;
+}
+
+function openSettingsDrawer() {
+  if (!getFeatureFlag(window._featureFlags, "enable_advanced_diagnostics", true)) {
+    LoqiiToast("Advanced diagnostics are disabled by admin.", { level: "warning" });
+    return;
+  }
+  LoqiiDrawer({ title: "Settings & Diagnostics", body: buildAdvancedDrawerMarkup(), width: 560 });
+  performanceGrid = document.getElementById("performance-grid");
+  promptDebugEl = document.getElementById("prompt-debug");
+  settingsSectionsEl = document.getElementById("settings-sections");
+  bindIntensityControls();
+  renderSettingsSections();
+  renderPerformanceSnapshot();
+}
+
+function openHelpDrawer() {
+  if (!getFeatureFlag(window._featureFlags, "enable_help_center", true)) {
+    LoqiiToast("Help Center is disabled by admin.", { level: "warning" });
+    return;
+  }
+  LoqiiDrawer({ title: "Help Center", body: buildHelpMarkup(), width: 560 });
+}
+
+function openAccountDrawer() {
+  const session = isElectron ? null : null;
+  const body = `
+    <section class="loqii-section">
+      <div class="loqii-section-title">Account</div>
+      <div class="loqii-section-copy">Manage account details, purchases, and dashboard views.</div>
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Credits</div>
+      <div class="loqii-section-copy">Current balance: <strong>${hdrCreditsVal?.textContent || "--"}</strong></div>
+    </section>
+    <section class="loqii-section">
+      <button id="drawer-dashboard-btn" class="loqii-btn loqii-btn-primary" type="button">Open Dashboard</button>
+      <button id="drawer-topup-btn" class="loqii-btn" type="button">Buy Credits</button>
+    </section>`;
+  LoqiiDrawer({ title: "Account", body, width: 460 });
+  document.getElementById("drawer-dashboard-btn")?.addEventListener("click", () => window.tzurah.openDashboard());
+  document.getElementById("drawer-topup-btn")?.addEventListener("click", () => window.tzurah.openTopup());
+}
 
 subscribeSessionState((state) => {
   const description = describeSessionState(state);
@@ -2968,51 +3032,34 @@ async function openMockTopupModal() {
     } catch (e) { console.error("[MOCK TOPUP] Failed to load packs:", e); }
   }
 
-  const ov = document.createElement("div");
-  ov.style.cssText = "position:fixed;inset:0;background:rgba(1,22,39,.75);z-index:9999;display:flex;align-items:center;justify-content:center";
-
   const packCards = packs.length ? packs.map(p => {
     const totalSec = Math.round((p.credits || 0) / (window._burnRate || 2.18));
     const m = Math.floor(totalSec / 60), s = totalSec % 60;
     const timeStr = m > 0 ? `${m}m${s ? " " + s + "s" : ""}` : `${s}s`;
     const isPopular = p.is_popular === true;
-    const cardBorder  = isPopular ? '2px solid #3F6C51' : '1px solid rgba(63,108,81,.2)';
-    const cardBg      = isPopular ? 'rgba(63,108,81,0.08)' : '#011627';
-    const nameFontSize = isPopular ? '14px' : '13px';
     const popularBadge = isPopular
-      ? `<span style="position:absolute;top:-1px;right:-1px;background:linear-gradient(135deg,#3F6C51,#606D5D);color:#F7F3E3;font-size:10px;font-weight:700;padding:4px 10px;border-radius:0 8px 0 8px;line-height:1;white-space:nowrap;z-index:1">POPULAR</span>`
+      ? `<span style="color:var(--text-success);font-size:10px;font-weight:800;text-transform:uppercase">Popular</span>`
       : '';
-    return `<div style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;background:${cardBg};border:${cardBorder};gap:12px">
-      ${popularBadge}
-      <div>
-        <div style="font-weight:${isPopular?'700':'600'};font-size:${nameFontSize};color:#F7F3E3">${p.name}</div>
-        <div style="font-size:11px;color:#606D5D;margin-top:2px">${p.credits} cr &middot; ~${timeStr}</div>
+    return `<div class="loqii-section" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="min-width:0">
+        <div style="font-weight:800;color:var(--text-primary)">${p.name} ${popularBadge}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${p.credits} cr &middot; ~${timeStr}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-weight:700;color:#3F6C51">$${p.price_usd}</span>
-        <button data-pack-id="${p.id}" data-pack-name="${p.name}" data-pack-credits="${p.credits}" class="mock-buy-btn" style="background:rgba(201,112,100,.15);color:#C97064;border:1px solid rgba(201,112,100,.4);padding:5px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Mock Buy</button>
+        <span style="font-weight:800;color:var(--text-success)">$${p.price_usd}</span>
+        <button data-pack-id="${p.id}" data-pack-name="${p.name}" data-pack-credits="${p.credits}" class="loqii-btn loqii-btn-danger mock-buy-btn" type="button">Mock Buy</button>
       </div>
     </div>`;
-  }).join("") : `<div style="color:#606D5D;text-align:center;padding:20px">No packs available</div>`;
+  }).join("") : LoqiiEmptyState("No packs available");
 
-  ov.innerHTML = `
-    <div style="background:#011627;border:1px solid #3F6C51;border-radius:12px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
-      <div style="padding:16px 18px;border-bottom:1px solid rgba(63,108,81,.3);display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-weight:700;font-size:15px;color:#C97064"> TEST MODE  Mock Payments</div>
-          <div style="font-size:11px;color:#606D5D;margin-top:2px">Credits added instantly, no real charge</div>
-        </div>
-        <button id="mock-topup-close" style="background:none;border:none;color:#606D5D;font-size:18px;cursor:pointer;padding:4px 8px"></button>
-      </div>
-      <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
-        <div id="mock-topup-msg"></div>
-        ${packCards}
-      </div>
-    </div>`;
-
-  document.body.appendChild(ov);
-  ov.addEventListener("click", e => { if (e.target === ov) ov.remove(); });
-  ov.querySelector("#mock-topup-close").addEventListener("click", () => ov.remove());
+  LoqiiModal({
+    title: "Test Mode - Mock Payments",
+    body: `<div class="loqii-section-copy" style="margin-bottom:10px">Credits are added instantly. No real charge is made.</div><div id="mock-topup-msg"></div>${packCards}`,
+    confirmLabel: "Close",
+    cancelable: false,
+    width: 520,
+  });
+  const ov = document.querySelector(".loqii-overlay");
 
   ov.querySelectorAll(".mock-buy-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -3027,12 +3074,12 @@ async function openMockTopupModal() {
       const result = await window.tzurah.mockPurchase(packId);
 
       if (result?.error) {
-        msgEl.innerHTML = `<div style="padding:8px 12px;border-radius:6px;background:rgba(201,112,100,.1);border:1px solid rgba(201,112,100,.3);color:#C97064;font-size:12px;margin-bottom:6px"> ${result.error}</div>`;
+        msgEl.innerHTML = `<div class="loqii-section-copy" style="color:var(--text-danger);margin-bottom:8px">${result.error}</div>`;
         ov.querySelectorAll(".mock-buy-btn").forEach(b => { b.disabled = false; });
-        btn.textContent = " Mock Buy";
+        btn.textContent = "Mock Buy";
       } else {
         const added = result?.credits_added ?? packCredits;
-        msgEl.innerHTML = `<div style="padding:8px 12px;border-radius:6px;background:rgba(63,108,81,.1);border:1px solid rgba(63,108,81,.3);color:#3F6C51;font-size:12px;margin-bottom:6px"> Mock purchase successful! +${added} credits added.</div>`;
+        msgEl.innerHTML = `<div class="loqii-section-copy" style="color:var(--text-success);margin-bottom:8px">Mock purchase successful. +${added} credits added.</div>`;
         addCenterAlert("gift", `Mock purchase: +${added} cr added! (${packName})`);
         if (typeof result?.new_balance === "number") {
           updateCreditsHeader(result.new_balance);
@@ -3040,7 +3087,7 @@ async function openMockTopupModal() {
           hdrCreditsVal.style.animation = "creditFlash 0.8s ease 3";
           setTimeout(() => { hdrCreditsVal.style.animation = ""; }, 2500);
         }
-        setTimeout(() => ov.remove(), 2000);
+        setTimeout(() => ov?.remove(), 2000);
       }
     });
   });
@@ -4396,8 +4443,8 @@ document.querySelectorAll("[data-mode-preset]").forEach((btn) => {
 // PHASE B4: Intensity slider
 // 
 
-const intensitySlider = document.getElementById("intensity-slider");
-const intensityValue  = document.getElementById("intensity-value");
+let intensitySlider = document.getElementById("intensity-slider");
+let intensityValue  = document.getElementById("intensity-value");
 
 let currentIntensity = 100;
 let intensityDebounceTimer = null;
@@ -4415,12 +4462,18 @@ function updateIntensityLabel(val) {
   if (intensityValue) intensityValue.textContent = `${val}% - ${intensityLabel(val)}`;
 }
 
-intensitySlider?.addEventListener("input", (e) => {
-  currentIntensity = parseInt(e.target.value);
+function bindIntensityControls() {
+  intensitySlider = document.getElementById("intensity-slider");
+  intensityValue  = document.getElementById("intensity-value");
+  if (!intensitySlider) return;
+  intensitySlider.value = String(currentIntensity);
   updateIntensityLabel(currentIntensity);
-  // No sdk.set() here - intensity is only applied when user clicks Apply
-  clearTimeout(intensityDebounceTimer);
-});
+  intensitySlider.addEventListener("input", (e) => {
+    currentIntensity = parseInt(e.target.value, 10);
+    updateIntensityLabel(currentIntensity);
+    clearTimeout(intensityDebounceTimer);
+  });
+}
 
 updateIntensityLabel(100);
 
@@ -4582,12 +4635,10 @@ document.addEventListener("keydown", (e) => {
 });
 
 function showKeyboardShortcuts() {
-  document.getElementById("shortcuts-modal")?.remove();
-  const modal = document.createElement("div");
-  modal.id = "shortcuts-modal";
-  modal.className = "summary-overlay";
   const row = (k, v) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.8rem"><span style="color:var(--muted)">${v}</span><kbd style="background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:0.72rem;font-family:monospace">${k}</kbd></div>`;
-  modal.innerHTML = `<div class="summary-card" style="max-width:480px"><div class="summary-title">Keyboard Shortcuts</div>
+  LoqiiModal({
+    title: "Keyboard Shortcuts",
+    body: `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
       <div><div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Session</div>
         ${row("Space","Start / Stop")}${row("Escape","Stop session")}${row("Ctrl+R","Apply changes")}${row("Ctrl+Shift+R","Toggle recording")}
@@ -4595,13 +4646,13 @@ function showKeyboardShortcuts() {
       <div><div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Identities</div>
         ${row("1-5","Select slot")}${row("Delete","Clear active slot")}
         <div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 8px">App</div>
-        ${row("Ctrl+M","Minimize")}${row("Ctrl+D","Dashboard")}${row("Ctrl+B","Buy credits")}${row("Shift+?","This help")}
+        ${row("Ctrl+M","Minimize")}${row("Ctrl+D","Dashboard")}${row("Ctrl+B","Buy credits")}${row("Shift+?","Shortcuts")}
       </div>
-    </div>
-    <div class="summary-actions" style="margin-top:14px"><button class="summary-btn-close" onclick="document.getElementById('shortcuts-modal').remove()">Close</button></div>
-  </div>`;
-  document.body.appendChild(modal);
-  modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+    </div>`,
+    confirmLabel: "Close",
+    cancelable: false,
+    width: 520,
+  });
 }
 
 // 
@@ -4698,9 +4749,11 @@ let onboardingStep = 0;
 
 async function checkOnboarding() {
   if (!isElectron) return;
+  if (!getFeatureFlag(window._featureFlags, "show_onboarding", true)) return;
+  if (getFeatureFlag(window._featureFlags, "onboarding_dev_only", false) && !getFeatureFlag(window._featureFlags, "enable_dev_tools", false)) return;
   try {
     const done = await window.tzurah.getPreference("onboarding_completed", "false");
-    if (done !== "true") showOnboarding();
+    if (done !== "true" || getFeatureFlag(window._featureFlags, "onboarding_required", false)) showOnboarding();
   } catch (e) {
     console.error("[ONBOARDING] Failed to check preference:", e.message);
   }
@@ -4711,37 +4764,34 @@ function showOnboarding() {
   renderOnboardingStep();
 }
 
-function renderOnboardingStep() {
-  document.getElementById("onboarding-modal")?.remove();
+async function renderOnboardingStep() {
   const step = ONBOARDING_STEPS[onboardingStep];
   const isLast = onboardingStep === ONBOARDING_STEPS.length - 1;
   const isFirst = onboardingStep === 0;
   const dots = ONBOARDING_STEPS.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === onboardingStep ? "var(--accent)" : "var(--border)"}"></div>`).join("");
-  const modal = document.createElement("div");
-  modal.id = "onboarding-modal";
-  modal.className = "summary-overlay";
-  modal.innerHTML = `<div class="summary-card" style="max-width:460px;text-align:center">
-    <div style="display:flex;justify-content:center;gap:6px;margin-bottom:20px">${dots}</div>
-    <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">${step.subtitle}</div>
-    <div class="summary-title" style="font-size:1.1rem;margin-bottom:12px">${step.title}</div>
-    <p style="font-size:.85rem;color:var(--muted);line-height:1.6;margin-bottom:24px">${step.description}</p>
-    <div style="display:flex;gap:10px;justify-content:center;align-items:center">
-      ${!isFirst ? `<button class="summary-btn-close" id="onboard-back">Back</button>` : ""}
-      <button class="summary-btn-topup" id="onboard-next" style="min-width:140px">${step.action}</button>
-      ${!isLast ? `<button class="summary-btn-close" id="onboard-skip" style="font-size:.72rem">Skip tutorial</button>` : ""}
-    </div>
-  </div>`;
-  document.body.appendChild(modal);
-  document.getElementById("onboard-next")?.addEventListener("click", () => {
+  const result = await LoqiiModal({
+    title: step.title,
+    body: `
+      <div style="display:flex;justify-content:center;gap:6px;margin-bottom:14px">${dots}</div>
+      <div class="loqii-section-copy" style="text-transform:uppercase;letter-spacing:.08em;color:var(--text-success);font-weight:800;margin-bottom:8px">${step.subtitle}</div>
+      <p class="loqii-section-copy">${step.description}</p>`,
+    confirmLabel: step.action,
+    cancelLabel: isFirst ? "Skip tutorial" : "Back",
+    cancelable: !isLast,
+    width: 460,
+  });
+  if (result) {
     if (isLast) completeOnboarding();
     else { onboardingStep++; renderOnboardingStep(); }
-  });
-  document.getElementById("onboard-back")?.addEventListener("click", () => { onboardingStep--; renderOnboardingStep(); });
-  document.getElementById("onboard-skip")?.addEventListener("click", completeOnboarding);
+  } else if (isFirst) {
+    completeOnboarding();
+  } else {
+    onboardingStep = Math.max(0, onboardingStep - 1);
+    renderOnboardingStep();
+  }
 }
 
 async function completeOnboarding() {
-  document.getElementById("onboarding-modal")?.remove();
   if (isElectron) await window.tzurah.setPreference("onboarding_completed", "true");
   log("Welcome to Loqii! Press ? for keyboard shortcuts.", "success");
 }
@@ -4750,10 +4800,12 @@ async function completeOnboarding() {
 // PHASE C1: Feature flags
 // 
 
-let featureFlags = { enable_recording: true, enable_background: true, enable_auto_prompt: false, maintenance_mode: false };
+let featureFlags = normalizeAppFeatureFlags({ enable_recording: true, enable_background: true, enable_auto_prompt: false, maintenance_mode: false });
 
 function applyFeatureFlags(flags) {
   if (!flags) return;
+  flags = normalizeAppFeatureFlags(flags);
+  applyAppFeatureFlags(flags);
   if (!flags.enable_recording) {
     document.getElementById("btn-record")?.remove();
     document.getElementById("btn-record-action")?.remove();

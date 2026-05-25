@@ -647,52 +647,31 @@ ipcMain.handle("auth:google", async () => {
     });
     if (error || !data.url) return { error: error?.message || "Failed to get OAuth URL" };
 
-    // Open OAuth in an Electron popup instead of the system browser
+    // Open OAuth in the system browser and resolve through the existing
+    // tzurah:// deep-link handler. This avoids duplicate Electron app windows.
     const tokens = await new Promise((resolve, reject) => {
-      const authWin = new BrowserWindow({
-        width:           500,
-        height:          650,
-        parent:          mainWin || undefined,
-        modal:           true,
-        backgroundColor: "#ffffff",
-        autoHideMenuBar: true,
-        title:           "Sign in with Google",
-        webPreferences: {
-          nodeIntegration:  false,
-          contextIsolation: true,
-        },
-      });
-
-      authWin.loadURL(data.url);
-
       let settled = false;
-
-      function handleCallbackUrl(url) {
-        if (!url.startsWith("tzurah://auth/callback")) return;
-        const parsed = new URL(url.replace("tzurah://", "https://tzurah.invalid/"));
-        const hash   = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
-        const params = new URLSearchParams(hash);
-        const accessToken  = params.get("access_token");
-        const refreshToken = params.get("refresh_token") || "";
-        if (accessToken && !settled) {
-          settled = true;
-          authWin.destroy();
-          resolve({ access_token: accessToken, refresh_token: refreshToken });
-        }
-      }
-
-      authWin.webContents.on("will-redirect", (_e, url) => handleCallbackUrl(url));
-      authWin.webContents.on("will-navigate",  (_e, url) => handleCallbackUrl(url));
-      authWin.webContents.on("did-navigate",   (_e, url) => handleCallbackUrl(url));
-
-      authWin.on("closed", () => {
-        if (!settled) { settled = true; reject(new Error("cancelled")); }
-      });
+      pendingOAuthResolve = (tokens) => {
+        if (settled) return;
+        settled = true;
+        pendingOAuthResolve = null;
+        pendingOAuthReject = null;
+        resolve(tokens);
+      };
+      pendingOAuthReject = (err) => {
+        if (settled) return;
+        settled = true;
+        pendingOAuthResolve = null;
+        pendingOAuthReject = null;
+        reject(err);
+      };
+      shell.openExternal(data.url).catch((err) => pendingOAuthReject(err));
 
       setTimeout(() => {
         if (!settled) {
           settled = true;
-          if (!authWin.isDestroyed()) authWin.destroy();
+          pendingOAuthResolve = null;
+          pendingOAuthReject = null;
           reject(new Error("Google sign-in timed out. Please try again."));
         }
       }, 300_000);

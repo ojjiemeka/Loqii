@@ -6,14 +6,14 @@
   <title>Loqii — Sign In</title>
   <style>
     :root {
-      --bg:      #0a0a0f;
-      --surface: #111118;
-      --border:  #252535;
-      --text:    #e4e2ef;
+      --bg:      #011627;
+      --surface: rgba(247,243,227,.055);
+      --border:  rgba(96,109,93,.30);
+      --text:    #F7F3E3;
       --muted:   #5a5a72;
-      --accent:  #8b5cf6;
-      --green:   #22c55e;
-      --red:     #ef4444;
+      --accent:  #3F6C51;
+      --green:   #3F6C51;
+      --red:     #C97064;
       --radius:  10px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,7 +67,7 @@
     .brand-logo {
       width: 56px; height: 56px;
       border-radius: 14px;
-      background: linear-gradient(135deg, var(--accent), #6d28d9);
+      background: linear-gradient(135deg, var(--accent), #606D5D);
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto 14px;
       box-shadow: 0 0 36px rgba(139,92,246,.3);
@@ -100,7 +100,7 @@
       cursor: pointer;
       transition: border-color .15s, background .15s;
     }
-    .btn-google:hover { border-color: #444460; background: #13131f; }
+    .btn-google:hover { border-color: rgba(63,108,81,.48); background: rgba(63,108,81,.10); }
     .btn-google svg { flex-shrink: 0; }
 
     /* ── Divider ── */
@@ -136,19 +136,19 @@
       width: 100%; padding: 10px;
       font-size: 0.9rem; font-weight: 700; font-family: inherit;
       border: none; border-radius: 7px;
-      background: linear-gradient(135deg, var(--accent), #6d28d9);
-      color: #fff; cursor: pointer;
+      background: var(--accent);
+      color: #F7F3E3; cursor: pointer;
       transition: filter .15s, box-shadow .15s;
     }
     .btn-primary:hover:not(:disabled) {
       filter: brightness(1.1);
-      box-shadow: 0 0 18px rgba(139,92,246,.4);
+      box-shadow: 0 0 18px rgba(63,108,81,.26);
     }
     .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
 
     .spinner {
       display: inline-block; width: 13px; height: 13px;
-      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border: 2px solid rgba(247,243,227,.3); border-top-color: #F7F3E3;
       border-radius: 50%; animation: spin .7s linear infinite;
       vertical-align: middle; margin-right: 6px;
     }
@@ -260,6 +260,24 @@
   const msgEl      = document.getElementById("msg");
   const btnSignin  = document.getElementById("btn-signin");
   const btnGoogle  = document.getElementById("btn-google");
+
+  async function loadLoginFlags() {
+    try {
+      const res = await fetch("http://localhost:3000/api/config", { cache: "no-store" });
+      if (!res.ok) throw new Error("config unavailable");
+      const data = await res.json();
+      return data.feature_flags || {};
+    } catch {
+      return {};
+    }
+  }
+
+  loadLoginFlags().then((flags) => {
+    if (flags.enable_google_oauth !== true) {
+      btnGoogle.style.display = "none";
+      document.querySelector(".divider")?.remove();
+    }
+  });
 
   function showMsg(text, type) {
     msgEl.textContent = text;

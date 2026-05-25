@@ -142,9 +142,15 @@ Debug checklist:
 Locations:
 - `admin.html`
 - `index.html`
+- `loqiiModal.js`
+- `loqiiDrawer.js`
+- `loqiiToast.js`
+- `loqiiHelp.js`
+- `loqiiTheme.js`
 
 Responsibility:
 - Replace native browser dialogs with reusable dark-theme promise-based modals.
+- Keep app-side modals, drawers, empty states, loading states, Help, and settings surfaces bounded and theme-safe.
 
 Public API:
 - `showModalAlert(message, options)`
@@ -168,6 +174,27 @@ Debug checklist:
 - Confirm overlay dispatches `modal:closed`.
 - Check callbacks are promise-safe.
 - Avoid native `alert()`, `confirm()`, and `prompt()`.
+- Do not add new one-off modal HTML in `index.html`; extend the Loqii UX component modules instead.
+
+## Loqii App UX Control Plane
+
+Locations:
+- `loqiiModal.js`
+- `loqiiDrawer.js`
+- `loqiiToast.js`
+- `loqiiTheme.js`
+- `loqiiHelp.js`
+- `settingsArchitecture.js`
+
+Responsibility:
+- Shared UX primitives for modals, confirms, sheets/drawers, toasts, empty/loading states, Help Center, semantic theme aliases, and settings section scaffolds.
+- Feature-gated app surfaces such as Help, advanced diagnostics, onboarding, Google OAuth, mock payments, and developer controls.
+
+Debug checklist:
+- Confirm drawers have bounded height and internal scroll.
+- Confirm Escape closes cancelable drawers/modals.
+- Confirm dark mode text uses semantic tokens rather than hardcoded black text.
+- If feature flag fetch fails, experimental features should default off while core login/start/stop remains usable.
 
 ## Server And API Modules
 
