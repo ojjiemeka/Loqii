@@ -32,21 +32,29 @@
       --red: var(--loqii-coral);
       --orange: var(--loqii-coral);
       --video-panel: var(--loqii-ink);
+      --video-empty-bg: var(--loqii-ink);
+      --preview-grid: rgba(247,243,227,.035);
+      --preview-label-bg: rgba(1,22,39,.7);
+      --preview-label-text: var(--loqii-paper);
       --overlay: rgba(1,22,39,.7);
+      --console-bg: rgba(1,22,39,.88);
+      --console-send: var(--loqii-paper);
+      --primary-button-text: var(--loqii-paper);
+      --danger-button-text: var(--loqii-paper);
       --panel-soft: rgba(247,243,227,.055);
       --shadow: rgba(1,22,39,.45);
       --panel-gradient: linear-gradient(180deg, rgba(247,243,227,.055), rgba(247,243,227,.024));
     }
 
     body[data-theme="light"] {
-      --bg: rgba(96,109,93,.18);
+      --bg: var(--loqii-paper);
       --surface: var(--loqii-paper);
-      --surface2: rgba(96,109,93,.11);
-      --surface3: rgba(96,109,93,.16);
-      --field: rgba(247,243,227,.72);
+      --surface2: rgba(96,109,93,.08);
+      --surface3: rgba(96,109,93,.13);
+      --field: rgba(247,243,227,.92);
       --bar: rgba(247,243,227,.96);
-      --border: rgba(96,109,93,.34);
-      --border-strong: rgba(96,109,93,.56);
+      --border: rgba(96,109,93,.26);
+      --border-strong: rgba(96,109,93,.44);
       --text: var(--loqii-ink);
       --muted: var(--loqii-muted);
       --accent: var(--loqii-green);
@@ -54,11 +62,19 @@
       --green: var(--loqii-green);
       --red: var(--loqii-coral);
       --orange: var(--loqii-coral);
-      --video-panel: var(--loqii-ink);
+      --video-panel: var(--loqii-paper);
+      --video-empty-bg: rgba(247,243,227,.78);
+      --preview-grid: rgba(96,109,93,.13);
+      --preview-label-bg: rgba(247,243,227,.82);
+      --preview-label-text: var(--loqii-ink);
       --overlay: rgba(1,22,39,.68);
+      --console-bg: rgba(247,243,227,.82);
+      --console-send: var(--loqii-ink);
+      --primary-button-text: var(--loqii-paper);
+      --danger-button-text: var(--loqii-paper);
       --panel-soft: rgba(96,109,93,.09);
-      --shadow: rgba(1,22,39,.14);
-      --panel-gradient: linear-gradient(180deg, rgba(247,243,227,.96), rgba(247,243,227,.86));
+      --shadow: rgba(1,22,39,.10);
+      --panel-gradient: linear-gradient(180deg, rgba(247,243,227,.98), rgba(247,243,227,.90));
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -323,7 +339,8 @@
       position: absolute; top: 9px; left: 9px; padding: 3px 9px;
       border-radius: 10px; font-size: 0.64rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.05em;
-      background: var(--overlay); backdrop-filter: blur(6px);
+      background: var(--preview-label-bg); color: var(--preview-label-text);
+      backdrop-filter: blur(6px);
       border: 1px solid var(--border); z-index: 2;
     }
 
@@ -333,27 +350,27 @@
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       gap: 8px; color: var(--muted); font-size: 0.78rem;
-      background: var(--loqii-ink);
+      background: var(--video-empty-bg);
       transition: opacity 0.3s;
     }
     .video-ph::after {
       content: '';
       position: absolute; inset: 0;
       background:
-        radial-gradient(circle at 50% 50%, rgba(63,108,81,.15), transparent 34%),
-        linear-gradient(180deg, transparent, rgba(1,22,39,.42));
+        radial-gradient(circle at 50% 50%, rgba(63,108,81,.12), transparent 34%),
+        linear-gradient(180deg, transparent, rgba(96,109,93,.10));
       pointer-events: none;
     }
     .video-ph::before {
       content: '';
       position: absolute; inset: 0;
       background-image:
-        linear-gradient(rgba(247,243,227,0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(247,243,227,0.035) 1px, transparent 1px);
+        linear-gradient(var(--preview-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--preview-grid) 1px, transparent 1px);
       background-size: 40px 40px;
       pointer-events: none;
     }
-    .video-ph svg { opacity: .25; position: relative; z-index: 1; }
+    .video-ph svg { opacity: .34; position: relative; z-index: 1; color: var(--loqii-green); }
     .video-ph span { position: relative; z-index: 1; }
     @keyframes gradientShift {
       0%   { background-position: 0% 50%; }
@@ -787,10 +804,10 @@
       font-family: inherit; border: none; border-radius: 6px;
       cursor: pointer; transition: all 0.2s cubic-bezier(0.4,0,0.2,1); white-space: nowrap;
     }
-    .btn-start { background: var(--loqii-green); color: var(--loqii-paper); }
+    .btn-start { background: var(--loqii-green); color: var(--primary-button-text); }
     .btn-start:hover:not(:disabled) { filter: brightness(1.12); box-shadow: 0 0 16px var(--accent-glow); }
     .btn-start:disabled { opacity: .46; cursor: not-allowed; filter: saturate(.7); }
-    .btn-stop { background: var(--loqii-coral); color: var(--loqii-paper); border: 1px solid rgba(201,112,100,.58); }
+    .btn-stop { background: var(--loqii-coral); color: var(--danger-button-text); border: 1px solid rgba(201,112,100,.58); }
     .btn-stop:hover { filter: brightness(1.08); box-shadow: 0 0 16px rgba(201,112,100,.16); }
     .btn-apply { background: rgba(63,108,81,.18); color: var(--text); border: 1px solid rgba(63,108,81,.42); }
     .btn-apply:hover:not(:disabled) { background: rgba(63,108,81,.26); border-color: var(--loqii-green); box-shadow: 0 0 14px rgba(63,108,81,.14); }
@@ -802,6 +819,15 @@
     .btn-obs.streaming::before { content: "LIVE "; }
     .btn-copy { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); font-size: 0.74rem; padding: 5px 10px; }
     .btn-copy:hover { color: var(--text); border-color: rgba(63,108,81,.5); box-shadow: 0 0 12px rgba(63,108,81,.10); }
+    #btn-scene-reset {
+      color: var(--loqii-coral);
+      border-color: rgba(201,112,100,.34);
+      background: rgba(201,112,100,.08);
+    }
+    #btn-scene-reset:hover {
+      border-color: rgba(201,112,100,.55);
+      box-shadow: 0 0 12px rgba(201,112,100,.12);
+    }
     .obs-row {
       flex-shrink: 0; display: flex; align-items: center; gap: 8px;
       margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border);
@@ -811,7 +837,7 @@
     /*  Console card  */
     .console-out {
       flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
-      background: rgba(1,22,39,.88); border: 1px solid rgba(96,109,93,.2);
+      background: var(--console-bg); border: 1px solid rgba(96,109,93,.2);
       border-radius: 5px; padding: 7px 8px;
       font-family: "Consolas", "Cascadia Code", "Monaco", "Courier New", monospace;
       font-size: 0.67rem; line-height: 1.55;
@@ -824,7 +850,7 @@
     .log-success { color: var(--loqii-green); }
     .log-error   { color: var(--loqii-coral); }
     .log-warning { color: var(--loqii-coral); }
-    .log-send    { color: var(--loqii-paper); }
+    .log-send    { color: var(--console-send); }
     .log-recv    { color: var(--loqii-green); }
     .console-placeholder {
       display: flex; align-items: center; justify-content: center;
@@ -1200,7 +1226,7 @@
     .tz-modal-btn-danger { background: var(--red); border-color: var(--red); }
   </style>
 </head>
-<body data-theme="dark">
+<body data-theme="light">
 
 <!--  Header  -->
 <header>
@@ -1223,8 +1249,8 @@
   </div>
 
   <div class="theme-toggle" id="theme-toggle" aria-label="Theme">
-    <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-    <button type="button" data-theme-choice="dark" aria-pressed="true" class="active">Dark</button>
+    <button type="button" data-theme-choice="light" aria-pressed="true" class="active">Light</button>
+    <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
   </div>
 
   <!-- Flex spacer -->
@@ -1669,9 +1695,9 @@ themeButtons.forEach((btn) => {
   btn.addEventListener("click", () => setLoqiiTheme(btn.dataset.themeChoice));
 });
 try {
-  setLoqiiTheme(localStorage.getItem("loqii-theme") || document.body.dataset.theme || "dark");
+  setLoqiiTheme(localStorage.getItem("loqii-theme") || document.body.dataset.theme || "light");
 } catch {
-  setLoqiiTheme("dark");
+  setLoqiiTheme("light");
 }
 
 function setWorkspacePanel(panelName) {
