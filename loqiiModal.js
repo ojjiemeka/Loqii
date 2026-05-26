@@ -1,3 +1,5 @@
+import { applyThemeToOverlayRoot } from "./loqiiTheme.js";
+
 let stylesInjected = false;
 
 function escapeHtml(value) {
@@ -176,6 +178,7 @@ export function LoqiiModal(options = {}) {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "loqii-overlay";
+    applyThemeToOverlayRoot(overlay);
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.innerHTML = `

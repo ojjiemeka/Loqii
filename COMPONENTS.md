@@ -196,6 +196,18 @@ Debug checklist:
 - Confirm dark mode text uses semantic tokens rather than hardcoded black text.
 - If feature flag fetch fails, experimental features should default off while core login/start/stop remains usable.
 
+Permanent user/dev mode rules:
+- No developer scaffolding is visible in user mode.
+- No fake, static, or placeholder metrics are shown as live product data.
+- No raw debug text, Decart routing metadata, prompt layers, retry timers, or feature flag snapshots appear outside a Developer section.
+- All modals use `LoqiiModal` or `LoqiiConfirm`; all drawers use `LoqiiDrawer`.
+- All new text and surfaces use semantic theme tokens, not hardcoded black/white styling.
+- Light and dark mode must be manually checked for every new modal, drawer, alert, and settings section.
+- Account remains a single drawer surface; do not add a second account window or nested account modal.
+- Add Credits remains the shared themed flow; do not reintroduce standalone Buy Credits modal styling.
+- New diagnostics, debug panels, and internal metrics must be feature-flagged and hidden by default.
+- User-facing empty states use clear product language such as `No data yet`, `Not available yet`, or `Start a session to view this`; raw `unknown`, `none`, `--`, `null`, and `undefined` are developer-only.
+
 Modal/drawer theme audit:
 - Migrated: unified Account drawer, unified Add Credits modal, Settings drawer, Help drawer, top-up fallback window, account dashboard fallback window, dashboard sign-out confirm, native camera/audio selects.
 - Already shared: keyboard shortcuts, onboarding, generic alerts/confirms/prompts, mock top-up flow.

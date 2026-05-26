@@ -10,12 +10,31 @@ export const LOQII_THEME_TOKENS = Object.freeze({
   "--text-success": "var(--loqii-green)",
   "--accent-primary": "var(--loqii-green)",
   "--accent-danger": "var(--loqii-coral)",
+  "--alert-text": "var(--text-primary)",
+  "--alert-bg": "var(--surface-elevated)",
+  "--alert-border": "var(--border)",
+  "--alert-badge-bg": "var(--accent-danger)",
+  "--alert-badge-text": "var(--loqii-paper)",
 });
 
 export function applyLoqiiThemeAliases(root = document.documentElement) {
   Object.entries(LOQII_THEME_TOKENS).forEach(([key, value]) => {
     root.style.setProperty(key, value);
   });
+}
+
+export function getActiveThemeClass(source = document.body) {
+  const theme = source?.dataset?.theme === "light" ? "light" : "dark";
+  return `loqii-theme-${theme}`;
+}
+
+export function applyThemeToOverlayRoot(root, source = document.body) {
+  if (!root) return root;
+  const theme = source?.dataset?.theme === "light" ? "light" : "dark";
+  root.dataset.theme = theme;
+  root.classList.remove("loqii-theme-light", "loqii-theme-dark");
+  root.classList.add(`loqii-theme-${theme}`);
+  return root;
 }
 
 export function getFeatureFlag(flags, key, fallback = false) {

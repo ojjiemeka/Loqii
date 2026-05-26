@@ -270,7 +270,7 @@
   <div class="balance-banner">
     <div class="balance-left">
       <div class="balance-label">Credits Remaining</div>
-      <div class="balance-value" id="balance-val">--</div>
+      <div class="balance-value" id="balance-val">Loading</div>
       <div class="balance-time" id="balance-time"></div>
     </div>
     <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--accent-primary)" stroke-width="1.4">
@@ -315,7 +315,7 @@
     r.openExternal("mailto:support@tzurah.ai");
   });
 
-  // 2.18 cr/sec = 130.8 cr/min
+  // 2.18 credits per second = 130.8 credits per minute
   function creditsToTime(c) {
     const totalSec = Math.round(c / 2.18);
     const m = Math.floor(totalSec / 60), s = totalSec % 60;
@@ -364,7 +364,7 @@
     container.innerHTML = "";
     allPacks.forEach((pack) => {
       const mins   = Math.round(pack.credits / 130.8);
-      const perMin = mins > 0 ? (pack.price_usd / mins).toFixed(2) : "--";
+      const perMin = mins > 0 ? (pack.price_usd / mins).toFixed(2) : "Not available";
       const card   = document.createElement("div");
       card.className = "pack-card" + (pack.is_popular ? " popular" : "");
       card.dataset.id = pack.id;

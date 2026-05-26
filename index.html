@@ -50,6 +50,11 @@
       --text-success: var(--loqii-green);
       --accent-primary: var(--loqii-green);
       --accent-danger: var(--loqii-coral);
+      --alert-text: var(--text-primary);
+      --alert-bg: var(--surface-elevated);
+      --alert-border: var(--border);
+      --alert-badge-bg: var(--accent-danger);
+      --alert-badge-text: var(--loqii-paper);
       --radius: 8px;
     }
 
@@ -84,6 +89,11 @@
       --panel-soft: rgba(247,243,227,.055);
       --shadow: rgba(1,22,39,.45);
       --panel-gradient: linear-gradient(180deg, rgba(247,243,227,.055), rgba(247,243,227,.024));
+      --alert-text: var(--loqii-paper);
+      --alert-bg: rgba(1,22,39,.94);
+      --alert-border: rgba(96,109,93,.34);
+      --alert-badge-bg: var(--loqii-coral);
+      --alert-badge-text: var(--loqii-paper);
     }
 
     body[data-theme="light"] {
@@ -117,6 +127,11 @@
       --panel-soft: rgba(96,109,93,.09);
       --shadow: rgba(1,22,39,.10);
       --panel-gradient: linear-gradient(180deg, rgba(247,243,227,.98), rgba(247,243,227,.90));
+      --alert-text: var(--loqii-ink);
+      --alert-bg: var(--loqii-paper);
+      --alert-border: rgba(96,109,93,.32);
+      --alert-badge-bg: var(--loqii-coral);
+      --alert-badge-text: var(--loqii-paper);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -287,14 +302,6 @@
     .stat-value.active  { color: var(--green); }
     .stat-value.dim     { color: var(--muted); }
     .stat-value.warning { color: var(--orange); }
-    .rate-input {
-      width: 4.5ch; background: transparent; border: none;
-      border-bottom: 1px dashed var(--border); color: var(--text);
-      font: inherit; font-variant-numeric: tabular-nums;
-      text-align: right; outline: none; padding: 0;
-    }
-    .rate-input:focus { border-bottom-color: var(--accent); }
-
     /*  Camera selector bar  */
     .camera-bar {
       flex-shrink: 0; display: flex; align-items: center; gap: 8px;
@@ -1356,10 +1363,10 @@
       display:flex; align-items:center; justify-content:center;
       font-size:14px; font-weight:700; flex-shrink:0;
     }
-    .ann-icon-info    { background:rgba(63,108,81,.15);  color:#F7F3E3; animation:pulse-blue 2s infinite; }
-    .ann-icon-success { background:rgba(63,108,81,.15);   color:#3F6C51; animation:pop-in .4s ease; }
-    .ann-icon-warning { background:rgba(201,112,100,.15);  color:#C97064; animation:shake-icon 2s ease-in-out infinite; }
-    .ann-icon-error   { background:rgba(201,112,100,.15);   color:#C97064; animation:pulse-red 2s infinite; }
+    .ann-icon-info    { background:var(--alert-badge-bg); color:var(--alert-badge-text); animation:pulse-blue 2s infinite; }
+    .ann-icon-success { background:var(--surface-muted); color:var(--accent-primary); animation:pop-in .4s ease; }
+    .ann-icon-warning { background:var(--surface-muted); color:var(--accent-danger); animation:shake-icon 2s ease-in-out infinite; }
+    .ann-icon-error   { background:var(--surface-muted); color:var(--accent-danger); animation:pulse-red 2s infinite; }
     @keyframes pulse-blue {
       0%,100% { box-shadow:0 0 0 0 rgba(63,108,81,.4) }
       50%     { box-shadow:0 0 0 6px rgba(63,108,81,0) }
@@ -1382,13 +1389,14 @@
     /*  Announcement bell  */
     .ann-bell-btn {
       position:relative; background:none; border:none; cursor:pointer;
+      color:var(--alert-text);
       font-size:17px; padding:3px 5px; border-radius:6px; line-height:1;
       transition:filter .2s; -webkit-app-region:no-drag;
     }
     .ann-bell-btn.has-unread { filter:drop-shadow(0 0 4px rgba(201,112,100,.6)); }
     .ann-bell-badge {
       position:absolute; top:-2px; right:-2px;
-      background:#C97064; color:#F7F3E3; font-size:9px; font-weight:700;
+      background:var(--alert-badge-bg); color:var(--alert-badge-text); font-size:9px; font-weight:700;
       min-width:16px; height:16px; border-radius:8px;
       display:none; align-items:center; justify-content:center; padding:0 3px;
       pointer-events:none;
@@ -1406,24 +1414,24 @@
     /*  Bell dropdown  */
     .ann-bell-dropdown {
       position:fixed; top:46px; right:72px; width:300px; max-height:380px;
-      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      background:var(--alert-bg); border:1px solid var(--alert-border); border-radius:10px;
       box-shadow:0 8px 32px rgba(1,22,39,.5); z-index:99990;
       display:flex; flex-direction:column; overflow:hidden;
     }
     .ann-bell-drop-hdr {
-      padding:10px 14px; border-bottom:1px solid rgba(247,243,227,.08);
-      font-size:12px; font-weight:700; color:#F7F3E3;
+      padding:10px 14px; border-bottom:1px solid var(--alert-border);
+      font-size:12px; font-weight:700; color:var(--alert-text);
       display:flex; justify-content:space-between; align-items:center;
     }
     .ann-bell-drop-list { overflow-y:auto; flex:1; }
     .ann-bell-item {
       display:flex; align-items:flex-start; gap:10px; padding:10px 14px;
-      border-bottom:1px solid rgba(247,243,227,.04); font-size:11px;
+      border-bottom:1px solid var(--alert-border); font-size:11px;
     }
-    .ann-bell-item-title { font-weight:600; color:#F7F3E3; margin-bottom:2px; }
-    .ann-bell-item-time  { color:#606D5D; font-size:10px; }
+    .ann-bell-item-title { font-weight:600; color:var(--alert-text); margin-bottom:2px; }
+    .ann-bell-item-time  { color:var(--text-muted); font-size:10px; }
     .ann-bell-drop-footer {
-      padding:8px 14px; border-top:1px solid rgba(247,243,227,.08);
+      padding:8px 14px; border-top:1px solid var(--alert-border);
     }
 
     @keyframes maintenance-blink {
@@ -1508,7 +1516,7 @@
   <div class="header-right" id="electron-header" style="display:none">
     <div class="credits-display" id="credits-display">
       <span>Credits:</span>
-      <span class="credits-val" id="hdr-credits-val">--</span>
+      <span class="credits-val" id="hdr-credits-val">Loading</span>
       <span style="color:var(--muted)" id="hdr-credits-time"></span>
     </div>
     <button id="ann-bell-btn" class="ann-bell-btn" type="button" title="Session alerts" onclick="openAnnBellDropdown()">Alerts<span class="ann-bell-badge" id="ann-bell-badge"></span></button>
@@ -1539,26 +1547,24 @@
 <!--  Stats bar  -->
 <div class="stats-bar" id="stats-bar" style="display:none; margin: 8px 10px 0;">
   <div class="stat">
-    <span class="stat-label">Session</span>
+    <span class="stat-label">Session Time</span>
     <span class="stat-value active" id="stat-timer">00:00</span>
   </div>
   <div class="stat">
-    <span class="stat-label">Credits</span>
-    <span class="stat-value dim" id="stat-credits">--</span>
+    <span class="stat-label">Credits Left</span>
+    <span class="stat-value dim" id="stat-credits">No data yet</span>
   </div>
   <div class="stat">
-    <span class="stat-label">Used</span>
-    <span class="stat-value" id="stat-used">--</span>
+    <span class="stat-label">Credits Used</span>
+    <span class="stat-value" id="stat-used">No data yet</span>
   </div>
   <div class="stat">
-    <span class="stat-label">Cost</span>
-    <span class="stat-value" id="stat-cost">--</span>
+    <span class="stat-label">Est. Cost</span>
+    <span class="stat-value" id="stat-cost">No data yet</span>
   </div>
-  <div class="stat">
-    <span class="stat-label">Rate</span>
-    <input id="rate-input" class="rate-input" type="number" min="0" step="0.1"
-           value="0.1" title="Credits per second">
-    <span class="stat-label" style="margin-left:-2px">cr/s</span>
+  <div class="stat stat-dev-only" id="burn-rate-stat" style="display:none">
+    <span class="stat-label">Burn Rate</span>
+    <span class="stat-value" id="stat-burn-rate">No data yet</span>
   </div>
 </div>
 
@@ -1842,13 +1848,13 @@ function escapeHtml(value) {
 
 function formatCreditsValue(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n).toLocaleString() : "--";
+  return Number.isFinite(n) ? Math.round(n).toLocaleString() : "No data yet";
 }
 
 function formatPurchaseDate(ts) {
-  if (!ts) return "--";
+  if (!ts) return "Not available yet";
   const date = new Date(ts);
-  if (Number.isNaN(date.getTime())) return "--";
+  if (Number.isNaN(date.getTime())) return "Not available yet";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -1862,6 +1868,44 @@ function isMockPaymentsEnabled() {
   return getFeatureFlag(window._featureFlags, "enable_mock_payments", false) ||
     window._featureFlags?.mock_payments === true;
 }
+
+function isLocalDevMode() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("dev") === "1" ||
+      localStorage.getItem("loqii-dev-mode") === "true";
+  } catch {
+    return false;
+  }
+}
+
+function isDevMode() {
+  return getFeatureFlag(window._featureFlags, "enable_dev_tools", false) || isLocalDevMode();
+}
+
+function canShowDiagnostics() {
+  return isDevMode() ||
+    getFeatureFlag(window._featureFlags, "enable_advanced_diagnostics", false);
+}
+
+function canShowDebugPanels(kind = "any") {
+  if (isDevMode() || canShowDiagnostics()) return true;
+  if (kind === "prompt") return getFeatureFlag(window._featureFlags, "enable_prompt_debug", false);
+  if (kind === "session") return getFeatureFlag(window._featureFlags, "enable_session_debug", false);
+  if (kind === "performance") return getFeatureFlag(window._featureFlags, "enable_performance_metrics", false);
+  return false;
+}
+
+function updateDevOnlyVisibility() {
+  const visible = canShowDiagnostics();
+  document.querySelectorAll(".stat-dev-only").forEach((el) => {
+    el.style.display = visible ? "" : "none";
+  });
+}
+
+window.isDevMode = isDevMode;
+window.canShowDiagnostics = canShowDiagnostics;
+window.canShowDebugPanels = canShowDebugPanels;
 
 //  DOM 
 const inputVideo    = document.getElementById("input-video");
@@ -1880,7 +1924,8 @@ const statTimer     = document.getElementById("stat-timer");
 const statCredits   = document.getElementById("stat-credits");
 const statUsed      = document.getElementById("stat-used");
 const statCost      = document.getElementById("stat-cost");
-const rateInput     = document.getElementById("rate-input");
+const burnRateStat  = document.getElementById("burn-rate-stat");
+const statBurnRate  = document.getElementById("stat-burn-rate");
 const consoleOut    = document.getElementById("console-out");
 const electronHdr   = document.getElementById("electron-header");
 const hdrCreditsVal  = document.getElementById("hdr-credits-val");
@@ -1941,12 +1986,14 @@ const APP_FLAG_DEFAULTS = {
   enable_scene_engine: true,
   enable_style_engine: true,
   enable_new_modals: true,
-  enable_advanced_diagnostics: true,
+  enable_advanced_diagnostics: false,
   enable_help_center: true,
   enable_mock_payments: false,
   enable_dev_tools: false,
   enable_light_mode: true,
-  enable_performance_metrics: true,
+  enable_performance_metrics: false,
+  enable_prompt_debug: false,
+  enable_session_debug: false,
 };
 
 function normalizeAppFeatureFlags(flags = {}) {
@@ -1960,16 +2007,22 @@ function normalizeAppFeatureFlags(flags = {}) {
 function applyAppFeatureFlags(flags = {}) {
   window._featureFlags = normalizeAppFeatureFlags(flags);
   if (btnHelpHdr) btnHelpHdr.style.display = getFeatureFlag(window._featureFlags, "enable_help_center", true) ? "" : "none";
-  if (btnSettingsHdr) btnSettingsHdr.style.display = getFeatureFlag(window._featureFlags, "enable_advanced_diagnostics", true) ? "" : "none";
+  if (btnSettingsHdr) btnSettingsHdr.style.display = "";
   if (document.body) {
-    document.body.dataset.devTools = getFeatureFlag(window._featureFlags, "enable_dev_tools", false) ? "1" : "0";
+    document.body.dataset.devTools = isDevMode() ? "1" : "0";
   }
+  updateDevOnlyVisibility();
 }
 
 function setLoqiiTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
   document.body.dataset.theme = nextTheme;
   applyLoqiiThemeAliases();
+  document.querySelectorAll(".loqii-overlay, .loqii-drawer-overlay").forEach((root) => {
+    root.dataset.theme = nextTheme;
+    root.classList.toggle("loqii-theme-light", nextTheme === "light");
+    root.classList.toggle("loqii-theme-dark", nextTheme === "dark");
+  });
   try { localStorage.setItem("loqii-theme", nextTheme); } catch {}
   try { window.tzurah?.setPreference?.("loqii-theme", nextTheme); } catch {}
   themeButtons.forEach((btn) => {
@@ -2332,94 +2385,170 @@ const reconnectManager = createReconnectManager({
 function renderPerformanceSnapshot() {
   performanceGrid = document.getElementById("performance-grid");
   if (!performanceGrid) return;
+  if (!canShowDebugPanels("performance")) {
+    performanceGrid.innerHTML = LoqiiEmptyState("No diagnostic data yet.");
+    return;
+  }
   const perf = perfMonitor.getSnapshot();
   const reconnect = reconnectManager.getSnapshot();
-  const rows = [
-    ["FPS", perf.fps ? `${perf.fps}` : "--"],
-    ["Latency", perf.streamLatencyMs ? `${perf.streamLatencyMs}ms` : "--"],
-    ["RTT", perf.decartRttMs ? `${perf.decartRttMs}ms` : "--"],
-    ["Uptime", formatDuration(perf.uptimeMs)],
-    ["Reconnects", `${perf.reconnectCount}/${reconnect.maxAttempts}`],
-    ["Retry In", reconnect.secondsUntilRetry ? `${reconnect.secondsUntilRetry}s` : "--"],
-    ["Decart Env", window._lastDecartEnvironmentUsed || "unknown"],
-  ];
+  const rows = [];
+  if (perf.fps) rows.push(["FPS", `${perf.fps}`]);
+  if (perf.streamLatencyMs) rows.push(["Latency", `${perf.streamLatencyMs}ms`]);
+  if (perf.decartRttMs) rows.push(["RTT", `${perf.decartRttMs}ms`]);
+  if (perf.uptimeMs) rows.push(["Uptime", formatDuration(perf.uptimeMs)]);
+  if (perf.reconnectCount || reconnect.secondsUntilRetry) rows.push(["Reconnects", `${perf.reconnectCount}/${reconnect.maxAttempts}`]);
+  if (reconnect.secondsUntilRetry) rows.push(["Retry In", `${reconnect.secondsUntilRetry}s`]);
+  if (window._lastDecartEnvironmentUsed) rows.push(["Decart Env", window._lastDecartEnvironmentUsed]);
+  if (!rows.length) {
+    performanceGrid.innerHTML = LoqiiEmptyState("No diagnostic data yet.");
+    return;
+  }
   performanceGrid.innerHTML = rows.map(([label, value]) =>
     `<div class="perf-pill"><span class="perf-label">${label}</span><span class="perf-value">${value}</span></div>`
   ).join("");
 }
 
 function updatePromptDebug(snapshot) {
+  window._lastPromptDebugSnapshot = snapshot || null;
+  if (!canShowDebugPanels("prompt")) return;
   promptDebugEl = document.getElementById("prompt-debug");
   if (!promptDebugEl || !snapshot) return;
   promptDebugEl.textContent = [
-    `Layers: ${snapshot.activeLayers.join(", ") || "none"}`,
-    `Scene: ${snapshot.activeScene || "none"}`,
-    `Style: ${snapshot.activeStyle || "none"}`,
+    `Layers: ${snapshot.activeLayers.join(", ") || "No diagnostic data yet."}`,
+    `Scene: ${snapshot.activeScene || "No diagnostic data yet."}`,
+    `Style: ${snapshot.activeStyle || "No diagnostic data yet."}`,
     `Prompt: ${snapshot.finalPrompt}`,
   ].join("\n");
 }
 
 function renderSettingsSections() {
   if (!settingsSectionsEl) return;
-  settingsSectionsEl.innerHTML = "";
-  getSettingsSections().forEach((section) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "scene-filter-btn";
-    chip.title = section.description;
-    chip.textContent = section.name;
-    chip.addEventListener("click", () => {
-      log(`Settings section ready: ${section.name}`, "info");
-      realtimeStatus.showStatus(`${section.name} settings scaffold ready`, { level: "info" });
-    });
-    settingsSectionsEl.appendChild(chip);
-  });
+  const sections = getSettingsSections().filter((section) => section.id !== "developer" || canShowDiagnostics());
+  settingsSectionsEl.innerHTML = sections
+    .map((section) => `<span class="scene-filter-btn" title="${escapeHtml(section.description)}">${escapeHtml(section.name)}</span>`)
+    .join("");
 }
 renderSettingsSections();
 setInterval(renderPerformanceSnapshot, 1000);
 
-function buildAdvancedDrawerMarkup() {
-  const perf = performanceGrid?.outerHTML || `<div id="performance-grid" class="perf-grid" aria-label="Performance monitor"></div>`;
-  const debug = promptDebugEl?.outerHTML || `<pre id="prompt-debug" class="prompt-debug">Prompt debug will appear after Apply Prompt.</pre>`;
+function selectedOptionText(select) {
+  if (!select) return "Not available yet";
+  return select.options?.[select.selectedIndex]?.text || "Not available yet";
+}
+
+function settingsRow(label, value, className = "") {
+  const text = value == null || value === "" ? "Not available yet" : String(value);
+  return `
+    <div class="loqii-setting-row ${className}">
+      <span class="loqii-setting-label">${escapeHtml(label)}</span>
+      <span class="loqii-setting-value">${escapeHtml(text)}</span>
+    </div>`;
+}
+
+function diagnosticRow(label, value) {
+  if (value == null || value === "" || value === 0) return "";
+  return settingsRow(label, value, "loqii-diagnostic-row");
+}
+
+function buildDeveloperDiagnosticsMarkup() {
+  if (!canShowDiagnostics()) return "";
+  const perf = perfMonitor.getSnapshot();
+  const reconnect = reconnectManager.getSnapshot();
+  const promptSnapshot = window._lastPromptDebugSnapshot;
+  const rows = [
+    diagnosticRow("Decart environment", window._lastDecartEnvironmentUsed),
+    diagnosticRow("Reason", window._lastDecartReason),
+    diagnosticRow("RTT", perf.decartRttMs ? `${perf.decartRttMs}ms` : ""),
+    diagnosticRow("Reconnect count", perf.reconnectCount ? String(perf.reconnectCount) : ""),
+    diagnosticRow("Retry timer", reconnect.secondsUntilRetry ? `${reconnect.secondsUntilRetry}s` : ""),
+  ].filter(Boolean).join("");
+  const flags = Object.keys(window._featureFlags || {}).length
+    ? JSON.stringify(window._featureFlags, null, 2)
+    : "No diagnostic data yet.";
+  const prompt = promptSnapshot?.finalPrompt
+    ? JSON.stringify(promptSnapshot, null, 2)
+    : "No diagnostic data yet.";
   return `
     <section class="loqii-section">
-      <div class="loqii-section-title">Intensity</div>
+      <div class="loqii-section-title">Developer</div>
+      ${rows || `<div class="loqii-section-copy">No diagnostic data yet.</div>`}
+      <div class="loqii-section-title" style="margin-top:12px">Performance</div>
+      <div id="performance-grid" class="perf-grid" aria-label="Performance monitor"></div>
+      <div class="loqii-section-title" style="margin-top:12px">Raw Prompt Snapshot</div>
+      <pre id="prompt-debug" class="prompt-debug">${escapeHtml(prompt)}</pre>
+      <div class="loqii-section-title" style="margin-top:12px">Feature Flags</div>
+      <pre class="prompt-debug">${escapeHtml(flags)}</pre>
+    </section>`;
+}
+
+function buildSettingsDrawerMarkup() {
+  const scenePreset = getSelectedScenePreset();
+  const activeStyle = findStyle(activeStyleId);
+  const layoutMode = isPortraitMode ? "Portrait" : "Landscape";
+  const monitorBtn = document.getElementById("btn-monitor");
+  const monitorState = monitorBtn?.textContent === "ON" ? "On" : "Off";
+  return `
+    <section class="loqii-section">
+      <div class="loqii-section-title">General</div>
+      ${settingsRow("Theme", document.body.dataset.theme === "dark" ? "Dark" : "Light")}
+      ${settingsRow("App version", "Loading...")}
+      ${settingsRow("Account email", "Loading...")}
+      ${settingsRow("Credits", hdrCreditsVal?.textContent && hdrCreditsVal.textContent !== "--" ? `${hdrCreditsVal.textContent} remaining` : "No data yet")}
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Video</div>
+      ${settingsRow("Camera selected", selectedOptionText(webcamSelect))}
+      ${settingsRow("Layout mode", layoutMode)}
+      ${settingsRow("OBS status", obsActive ? "Connected" : "Not connected")}
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">Audio</div>
+      ${settingsRow("Mic input", selectedOptionText(micSelect))}
+      ${settingsRow("Mic output", selectedOptionText(speakerSelect))}
+      ${settingsRow("Monitor", monitorState)}
+    </section>
+    <section class="loqii-section">
+      <div class="loqii-section-title">AI</div>
       <div class="intensity-row">
         <label class="intensity-label">Intensity <span id="intensity-value">${currentIntensity || 100}% - ${intensityLabel(currentIntensity || 100)}</span></label>
         <input type="range" id="intensity-slider" min="0" max="100" value="${currentIntensity || 100}" step="5" class="intensity-slider">
         <div class="intensity-hints"><span>Subtle</span><span>Natural</span><span>Full</span></div>
       </div>
+      ${settingsRow("Scene behavior", scenePreset ? scenePreset.name : "No scene selected")}
+      ${settingsRow("Style behavior", activeStyle ? activeStyle.name : "No style selected")}
     </section>
     <section class="loqii-section">
-      <div class="loqii-section-title">Performance</div>
-      ${perf}
+      <div class="loqii-section-title">Help</div>
+      <button id="settings-help-btn" class="loqii-btn" type="button">Open Help Center</button>
     </section>
-    <section class="loqii-section">
-      <div class="loqii-section-title">Prompt Debug</div>
-      ${debug}
-    </section>
-    <section class="loqii-section">
-      <div class="loqii-section-title">Settings Architecture</div>
-      <div id="settings-sections" class="scene-filter-row" aria-label="Settings sections"></div>
-    </section>
-    <section class="loqii-section">
-      <div class="loqii-section-title">Session Debug</div>
-      <div class="loqii-section-copy">Decart environment: ${window._lastDecartEnvironmentUsed || "unknown"}<br>Reason: ${window._lastDecartReason || "none"}</div>
-    </section>`;
+    ${buildDeveloperDiagnosticsMarkup()}`;
+}
+
+async function hydrateSettingsDrawer() {
+  const [session, info, balance] = await Promise.all([
+    window.tzurah?.getSession?.().catch(() => null) || Promise.resolve(null),
+    window.tzurah?.appInfo?.().catch(() => null) || Promise.resolve(null),
+    window.tzurah?.getBalance?.().catch(() => null) || Promise.resolve(null),
+  ]);
+  const rows = document.querySelectorAll(".loqii-setting-row");
+  rows.forEach((row) => {
+    const label = row.querySelector(".loqii-setting-label")?.textContent;
+    const value = row.querySelector(".loqii-setting-value");
+    if (!value) return;
+    if (label === "App version") value.textContent = info?.version ? `Loqii v${info.version}` : "Not available yet";
+    if (label === "Account email") value.textContent = session?.email || "Not available yet";
+    if (label === "Credits" && typeof balance?.credits === "number") value.textContent = `${formatCreditsValue(balance.credits)} remaining`;
+  });
 }
 
 function openSettingsDrawer() {
-  if (!getFeatureFlag(window._featureFlags, "enable_advanced_diagnostics", true)) {
-    LoqiiToast("Advanced diagnostics are disabled by admin.", { level: "warning" });
-    return;
-  }
-  LoqiiDrawer({ title: "Settings & Diagnostics", body: buildAdvancedDrawerMarkup(), width: 560 });
+  LoqiiDrawer({ title: "Settings", body: buildSettingsDrawerMarkup(), width: 600 });
   performanceGrid = document.getElementById("performance-grid");
   promptDebugEl = document.getElementById("prompt-debug");
-  settingsSectionsEl = document.getElementById("settings-sections");
   bindIntensityControls();
-  renderSettingsSections();
+  document.getElementById("settings-help-btn")?.addEventListener("click", openHelpDrawer);
   renderPerformanceSnapshot();
+  hydrateSettingsDrawer().catch(() => {});
 }
 
 function openHelpDrawer() {
@@ -2444,12 +2573,12 @@ function buildAccountDrawerBody() {
         </article>
         <article class="loqii-account-card">
           <div class="loqii-account-title">Credits Remaining</div>
-          <div class="loqii-account-value accent">${escapeHtml(hdrCreditsVal?.textContent || "--")}</div>
+          <div class="loqii-account-value accent">${escapeHtml(hdrCreditsVal?.textContent && hdrCreditsVal.textContent !== "--" ? hdrCreditsVal.textContent : "No data yet")}</div>
           <div class="loqii-account-meta">${escapeHtml(hdrCreditsTime?.textContent || "")}</div>
         </article>
         <article class="loqii-account-card">
           <div class="loqii-account-title">Credits Used Total</div>
-          <div class="loqii-account-value">--</div>
+          <div class="loqii-account-value">No data yet</div>
           <div class="loqii-account-meta">Lifetime usage</div>
         </article>
         <article class="loqii-account-card">
@@ -2459,8 +2588,8 @@ function buildAccountDrawerBody() {
         </article>
       </div>
       <div class="loqii-account-actions">
-        <button id="account-dashboard-btn" class="loqii-btn" type="button">Open Dashboard</button>
         <button id="account-add-credits-btn" class="loqii-btn loqii-btn-primary" type="button">Add Credits</button>
+        <button id="account-sync-btn" class="loqii-btn" type="button">Sync Credits</button>
         <button id="account-signout-btn" class="loqii-btn loqii-btn-danger" type="button">Sign Out</button>
       </div>
       <section class="loqii-account-history" aria-label="Purchase History">
@@ -2498,7 +2627,7 @@ function renderAccountSummary(session, balance, info) {
     </article>
     <article class="loqii-account-card">
       <div class="loqii-account-title">Credits Remaining</div>
-      <div class="loqii-account-value accent">${formatCreditsValue(credits)}</div>
+      <div class="loqii-account-value accent">${typeof credits === "number" ? formatCreditsValue(credits) : "No data yet"}</div>
       <div class="loqii-account-meta">${typeof credits === "number" && credits > 0 ? `~ ${escapeHtml(creditsToTime(credits))} available` : "No available time"}</div>
     </article>
     <article class="loqii-account-card">
@@ -2544,12 +2673,23 @@ async function hydrateAccountDrawer() {
 }
 
 function openAccountDrawer() {
-  const drawer = LoqiiDrawer({ title: "Account", body: buildAccountDrawerBody(), width: 680 });
-  document.getElementById("account-dashboard-btn")?.addEventListener("click", () => {
-    setWorkspacePanel("workspace");
-    drawer.close();
-  });
+  LoqiiDrawer({ title: "Account", body: buildAccountDrawerBody(), width: 680 });
   document.getElementById("account-add-credits-btn")?.addEventListener("click", openAddCreditsModal);
+  document.getElementById("account-sync-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("account-sync-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Syncing...";
+    }
+    await window.tzurah.syncUsage?.().catch(() => {});
+    const balance = await window.tzurah.getBalance?.().catch(() => null);
+    if (typeof balance?.credits === "number") updateCreditsHeader(balance.credits);
+    await hydrateAccountDrawer().catch(() => {});
+    if (btn) {
+      btn.textContent = "Synced";
+      setTimeout(() => { btn.textContent = "Sync Credits"; btn.disabled = false; }, 1600);
+    }
+  });
   document.getElementById("account-signout-btn")?.addEventListener("click", async () => {
     const ok = await LoqiiConfirm("Sign out of Loqii?", {
       title: "Confirm sign out",
@@ -3062,35 +3202,37 @@ function fmtMMSS(ms) {
 function updateStatsUI(credits) {
   const elapsed = Date.now() - sessionStart;
   statTimer.textContent = fmtMMSS(elapsed);
-  if (credits !== null) {
+  if (typeof credits === "number") {
     statCredits.textContent = credits.toLocaleString();
     statCredits.className   = "stat-value";
-  }
-  if (startingCredits !== null && credits !== null) {
-    const used = startingCredits - credits;
-    statUsed.textContent = used >= 0 ? used.toLocaleString() : "--";
-    statCost.textContent = used >= 0 ? `$${(used * COST_PER_CREDIT).toFixed(2)}` : "--";
   } else {
-    const crRate   = parseFloat(rateInput.value) || 0.1;
-    const elapsedS = elapsed / 1000;
-    if (crRate > 0 && elapsedS > 0) {
-      const est = Math.round(crRate * elapsedS);
-      statUsed.textContent = `~${est}`;
-      statCost.textContent = `~$${(est * COST_PER_CREDIT).toFixed(2)}`;
-    } else {
-      statUsed.textContent = "--";
-      statCost.textContent = "--";
-    }
+    statCredits.textContent = "No data yet";
+    statCredits.className   = "stat-value dim";
+  }
+  if (startingCredits !== null && typeof credits === "number") {
+    const used = startingCredits - credits;
+    statUsed.textContent = used >= 0 ? used.toLocaleString() : "No data yet";
+    statCost.textContent = used >= 0 ? `$${(used * COST_PER_CREDIT).toFixed(2)}` : "No data yet";
+  } else {
+    statUsed.textContent = "No data yet";
+    statCost.textContent = "No data yet";
+  }
+  if (statBurnRate) {
+    const burnRate = Number(window._burnRate);
+    statBurnRate.textContent = Number.isFinite(burnRate) && burnRate > 0
+      ? `${burnRate.toFixed(2)} credits/sec`
+      : "No diagnostic data yet";
   }
 }
 
 function startStats() {
   statsBar.style.display  = "";
   statTimer.textContent   = "00:00";
-  statCredits.textContent = "--";
+  statCredits.textContent = "No data yet";
   statCredits.className   = "stat-value dim";
-  statUsed.textContent    = "--";
-  statCost.textContent    = "--";
+  statUsed.textContent    = "No data yet";
+  statCost.textContent    = "No data yet";
+  updateDevOnlyVisibility();
   startingCredits         = null;
   statsInterval = setInterval(async () => {
     let credits = null;
@@ -3111,8 +3253,6 @@ function stopStats() {
   statsBar.style.display = "none";
   startingCredits = null;
 }
-
-rateInput.addEventListener("input", () => updateStatsUI(null));
 
 //  Credits (Electron) 
 function creditsToTime(c) {
@@ -5172,20 +5312,20 @@ function renderAnnouncementsPanel(announcements) {
   const list = document.getElementById('ann-console-list');
   if (!list) return;
   if (!announcements.length) {
-    list.innerHTML = '<div style="padding:20px;text-align:center;color:#606D5D;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:8px"><span>No active announcements</span></div>';
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:8px"><span>No active announcements</span></div>';
     return;
   }
   const colors = {
-    info:    { border: '#3F6C51', text: '#3F6C51' },
-    warning: { border: '#C97064', text: '#C97064' },
-    error:   { border: '#C97064', text: '#C97064' },
-    success: { border: '#3F6C51', text: '#3F6C51' },
+    info:    { border: 'var(--accent-primary)', text: 'var(--alert-text)' },
+    warning: { border: 'var(--accent-danger)', text: 'var(--alert-text)' },
+    error:   { border: 'var(--accent-danger)', text: 'var(--alert-text)' },
+    success: { border: 'var(--accent-primary)', text: 'var(--alert-text)' },
   };
   list.innerHTML = announcements.map(ann => {
     const c = colors[ann.type] || colors.info;
     return `<div class="center-alert" style="border-left:3px solid ${c.border};padding-left:8px">
       <div class="center-alert-body">
-        <div class="center-alert-msg" style="color:#F7F3E3;font-weight:600">${ann.title}</div>
+        <div class="center-alert-msg" style="color:var(--alert-text);font-weight:600">${ann.title}</div>
         <div class="center-alert-msg" style="color:${c.text};font-size:0.78rem;margin-top:2px">${ann.message}</div>
       </div>
     </div>`;
@@ -5196,10 +5336,10 @@ window.showAnnouncementBanner = function showAnnouncementBanner(announcement) {
   document.getElementById(`ann-${announcement.id}`)?.remove();
 
   const colors = {
-    info:    { bg: '#011627', border: '#3F6C51', text: '#3F6C51', iconChar: 'i' },
-    warning: { bg: '#011627', border: '#C97064', text: '#C97064', iconChar: '!' },
-    error:   { bg: '#011627', border: '#C97064', text: '#C97064', iconChar: 'x' },
-    success: { bg: '#011627', border: '#3F6C51', text: '#3F6C51', iconChar: 'OK' },
+    info:    { bg: 'var(--alert-bg)', border: 'var(--accent-primary)', text: 'var(--alert-text)', iconChar: 'i' },
+    warning: { bg: 'var(--alert-bg)', border: 'var(--accent-danger)', text: 'var(--alert-text)', iconChar: '!' },
+    error:   { bg: 'var(--alert-bg)', border: 'var(--accent-danger)', text: 'var(--alert-text)', iconChar: 'x' },
+    success: { bg: 'var(--alert-bg)', border: 'var(--accent-primary)', text: 'var(--alert-text)', iconChar: 'OK' },
   };
   const c = colors[announcement.type] || colors.info;
   const annType = announcement.type || 'info';
@@ -5220,7 +5360,7 @@ window.showAnnouncementBanner = function showAnnouncementBanner(announcement) {
     <div style="display:flex;align-items:flex-start;gap:10px">
       <span class="ann-icon ann-icon-${annType}">${c.iconChar}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;margin-bottom:3px;color:#F7F3E3;font-size:0.85rem">${announcement.title}</div>
+        <div style="font-weight:700;margin-bottom:3px;color:var(--alert-text);font-size:0.85rem">${announcement.title}</div>
         <div style="color:${c.text};line-height:1.4">${announcement.message}</div>
       </div>
       <button id="dismiss-${announcement.id}" style="background:none;border:none;color:${c.text};cursor:pointer;font-size:1.1rem;padding:0;opacity:0.7;flex-shrink:0;line-height:1;margin-top:-2px;">x</button>
@@ -5296,7 +5436,7 @@ window.openAnnBellDropdown = function openAnnBellDropdown() {
   _annBellUnread = 0;
   updateAnnBellBadge();
 
-  const typeColors = { credits:'#C97064', gift:'#3F6C51', connection:'#F7F3E3', error:'#C97064', kill:'#C97064', warn:'#C97064', announce:'#3F6C51' };
+  const typeColors = { credits:'var(--accent-danger)', gift:'var(--accent-primary)', connection:'var(--alert-text)', error:'var(--accent-danger)', kill:'var(--accent-danger)', warn:'var(--accent-danger)', announce:'var(--accent-primary)' };
   const typeIcons  = { credits:'cr', gift:'gift', connection:'net', error:'x', kill:'stop', warn:'!', announce:'ann' };
   const items = _bellAlerts.length
     ? _bellAlerts.slice(0, BELL_ALERT_MAX).map(a => `
@@ -5307,7 +5447,7 @@ window.openAnnBellDropdown = function openAnnBellDropdown() {
             <div class="ann-bell-item-time">${annRelTime(a.time)}</div>
           </div>
         </div>`).join('')
-    : '<div style="padding:20px;text-align:center;color:#606D5D;font-size:12px">No session alerts</div>';
+    : '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">No session alerts</div>';
 
   const drop = document.createElement('div');
   drop.id = 'ann-bell-dropdown';
@@ -5315,11 +5455,11 @@ window.openAnnBellDropdown = function openAnnBellDropdown() {
   drop.innerHTML = `
     <div class="ann-bell-drop-hdr">
       <span>Session Alerts</span>
-      <button onclick="document.getElementById('ann-bell-dropdown')?.remove()" style="background:none;border:none;color:#606D5D;cursor:pointer;font-size:14px;padding:0;line-height:1">x</button>
+      <button onclick="document.getElementById('ann-bell-dropdown')?.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0;line-height:1">x</button>
     </div>
     <div class="ann-bell-drop-list">${items}</div>
     <div class="ann-bell-drop-footer">
-      <button onclick="_bellAlerts.length=0;_annBellUnread=0;updateAnnBellBadge();document.getElementById('ann-bell-dropdown')?.remove()" style="font-size:11px;color:#606D5D;background:none;border:none;cursor:pointer;padding:0">Clear all</button>
+      <button onclick="_bellAlerts.length=0;_annBellUnread=0;updateAnnBellBadge();document.getElementById('ann-bell-dropdown')?.remove()" style="font-size:11px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:0">Clear all</button>
     </div>`;
   document.body.appendChild(drop);
 

@@ -17,6 +17,36 @@
 - Google OAuth moved to system-browser deep-link flow to avoid duplicate app windows.
 - App feature flags are normalized client-side with safe defaults.
 
+## Phase 8C Stabilization
+
+- Settings is split into user mode and Developer diagnostics.
+- User mode shows only product settings: theme, app/account summary, camera/layout/OBS, audio routing, AI intensity/scene/style behavior, and Help.
+- Developer diagnostics are hidden by default and require `enable_dev_tools`, `enable_advanced_diagnostics`, or explicit local dev mode.
+- Live metrics must be honest: no static CR/S, no estimated usage presented as real usage, and no debug counters outside Developer.
+- Account remains one drawer with Add Credits, Sync Credits, Sign Out, and purchase history.
+- Alerts and shared modals inherit the active theme and use semantic alert/theme tokens.
+
+## Settings Maturity Roadmap
+
+- Persist user settings for selected devices, layout, AI intensity, scene/style defaults, and help preferences.
+- Add first-run camera/audio checks before starting a session.
+- Add accessible keyboard focus loops and screen-reader labels for all settings controls.
+- Keep settings sections stable and user-facing; experimental controls must ship inside Developer only.
+
+## Dev Diagnostics Roadmap
+
+- Centralize prompt snapshots, Decart metadata, reconnect state, RTT, and performance samples in a diagnostics store.
+- Add an exportable diagnostics bundle for support and QA without exposing secrets.
+- Add per-flag visibility tests so debug sections cannot regress into user mode.
+- Keep backend Decart routing authoritative; renderer diagnostics may display only non-secret routing metadata.
+
+## Feature Flag Control Plane Requirement
+
+- Debug and experimental app UI must be controlled by explicit flags.
+- Safe fallback is closed: if a flag is missing or fetch fails, user mode hides diagnostics.
+- Required diagnostic flags: `enable_dev_tools`, `enable_advanced_diagnostics`, `enable_performance_metrics`, `enable_prompt_debug`, and `enable_session_debug`.
+- Admin/server flags and app fallback names must stay documented together before beta release.
+
 ## Beta Blockers
 
 - Manual verification of Google OAuth callback on a clean Windows machine.

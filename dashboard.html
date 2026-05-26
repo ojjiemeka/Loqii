@@ -198,27 +198,6 @@
 
     .ver { text-align: center; font-size: 0.68rem; color: var(--muted); }
 
-    .loqii-confirm-overlay {
-      position: fixed; inset: 0; z-index: 9999;
-      display: flex; align-items: center; justify-content: center;
-      padding: 20px; background: rgba(1,22,39,.68); backdrop-filter: blur(8px);
-    }
-    .loqii-confirm-card {
-      width: min(360px, 100%);
-      background: var(--surface-elevated);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px;
-      box-shadow: 0 18px 60px rgba(1,22,39,.35);
-    }
-    .loqii-confirm-title { font-weight: 850; margin-bottom: 8px; }
-    .loqii-confirm-copy {
-      font-size: .86rem; color: var(--text-secondary);
-      line-height: 1.5; margin-bottom: 16px;
-    }
-    .loqii-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
-
     .spinner {
       display: inline-block; width: 11px; height: 11px;
       border: 2px solid rgba(63,108,81,.28); border-top-color: var(--accent);
@@ -232,6 +211,10 @@
   window.tzurah?.getPreference?.("loqii-theme", "light")
     .then((theme) => { document.body.dataset.theme = theme === "light" ? "light" : "dark"; })
     .catch(() => { document.body.dataset.theme = "light"; });
+</script>
+<script type="module">
+  import { LoqiiConfirm } from "./loqiiModal.js";
+  window.LoqiiConfirm = LoqiiConfirm;
 </script>
 
 <div class="titlebar">
@@ -255,7 +238,7 @@
     <div class="credits-header">
       <span class="credits-label">Credits Remaining</span>
     </div>
-    <div class="credits-value" id="credits-val">--</div>
+    <div class="credits-value" id="credits-val">Loading</div>
     <div class="credits-time"  id="credits-time"></div>
     <div class="credits-used"  id="credits-used"></div>
     <button class="btn-add-credits" id="btn-add-credits">Add Credits</button>
@@ -267,11 +250,11 @@
     <div class="info-card">
       <div class="row">
         <span class="row-label">Version</span>
-        <span class="row-value" id="val-version">--</span>
+        <span class="row-value" id="val-version">Loading</span>
       </div>
       <div class="row">
         <span class="row-label">Platform</span>
-        <span class="row-value" id="val-platform">--</span>
+        <span class="row-value" id="val-platform">Loading</span>
       </div>
     </div>
   </div>
@@ -318,7 +301,7 @@
   }
 
   function fmtDate(ts) {
-    if (!ts) return "--";
+    if (!ts) return "Not available yet";
     return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -346,18 +329,18 @@
       if (session.avatar_url) {
         avatarEl.innerHTML = `<img src="${session.avatar_url}" alt="">`;
       } else {
-        avatarEl.textContent = (session.display_name || session.email || "--")[0].toUpperCase();
+        avatarEl.textContent = (session.display_name || session.email || "L")[0].toUpperCase();
       }
-      document.getElementById("profile-name").textContent  = session.display_name || "--";
-      document.getElementById("profile-email").textContent = session.email        || "--";
+      document.getElementById("profile-name").textContent  = session.display_name || "Loqii user";
+      document.getElementById("profile-email").textContent = session.email        || "Not available yet";
 
       updateCreditsUI(session.credits_remaining, session.total_credits_used);
     }
 
     if (info) {
-      document.getElementById("val-version").textContent  = info.version  || "--";
-      document.getElementById("val-platform").textContent = info.platform || "--";
-      document.getElementById("footer-ver").textContent   = `Loqii v${info.version || "--"} - by Tzurah`;
+      document.getElementById("val-version").textContent  = info.version  || "Not available yet";
+      document.getElementById("val-platform").textContent = info.platform || "Not available yet";
+      document.getElementById("footer-ver").textContent   = `Loqii v${info.version || "Not available yet"} - by Tzurah`;
     }
 
     r.getBalance().then(({ credits }) => {
@@ -383,7 +366,7 @@
       list.innerHTML = purchases.slice(0, 10).map((p) => `
         <div class="purchase-row">
           <div class="purchase-left">
-            <div class="purchase-name">${p.pack_name || "--"}</div>
+            <div class="purchase-name">${p.pack_name || "Credit pack"}</div>
             <div class="purchase-date">${fmtDate(p.created_at)}</div>
           </div>
           <div class="purchase-right">
@@ -413,23 +396,10 @@
   });
 
   function showConfirm(message) {
-    return new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.className = "loqii-confirm-overlay";
-      overlay.innerHTML = `
-        <div class="loqii-confirm-card" role="dialog" aria-modal="true" aria-label="Confirm sign out">
-          <div class="loqii-confirm-title">Confirm sign out</div>
-          <div class="loqii-confirm-copy">${message}</div>
-          <div class="loqii-confirm-actions">
-            <button id="confirm-cancel" class="btn btn-ghost" type="button">Cancel</button>
-            <button id="confirm-ok" class="btn btn-danger" type="button">Sign out</button>
-          </div>
-        </div>`;
-      document.body.appendChild(overlay);
-      const finish = (value) => { overlay.remove(); resolve(value); };
-      overlay.querySelector("#confirm-cancel").addEventListener("click", () => finish(false));
-      overlay.querySelector("#confirm-ok").addEventListener("click", () => finish(true));
-      overlay.addEventListener("click", (event) => { if (event.target === overlay) finish(false); });
+    return window.LoqiiConfirm(message, {
+      title: "Confirm sign out",
+      confirmLabel: "Sign Out",
+      danger: true,
     });
   }
 

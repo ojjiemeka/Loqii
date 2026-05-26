@@ -1,3 +1,5 @@
+import { applyThemeToOverlayRoot } from "./loqiiTheme.js";
+
 let drawerStylesInjected = false;
 
 function injectDrawerStyles() {
@@ -41,6 +43,18 @@ function injectDrawerStyles() {
     }
     .loqii-section-copy { color: var(--text-secondary); font-size: .76rem; line-height: 1.5; }
     .loqii-drawer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .loqii-setting-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .loqii-setting-row:last-child { border-bottom: 0; }
+    .loqii-setting-label {
+      color: var(--text-secondary); font-size: .76rem; font-weight: 750;
+    }
+    .loqii-setting-value {
+      color: var(--text-primary); font-size: .78rem; font-weight: 850;
+      text-align: right; overflow-wrap: anywhere;
+    }
     .loqii-btn {
       border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px;
       background: var(--surface-elevated); color: var(--text-primary);
@@ -119,6 +133,7 @@ export function LoqiiDrawer({ title = "Loqii", body = "", width = 520, onClose }
   document.querySelectorAll(".loqii-drawer-overlay").forEach((el) => el.remove());
   const overlay = document.createElement("div");
   overlay.className = "loqii-drawer-overlay";
+  applyThemeToOverlayRoot(overlay);
   overlay.innerHTML = `
     <aside class="loqii-drawer" style="width:min(${Number(width) || 520}px,100%)" role="dialog" aria-modal="true" aria-label="${title}">
       <header class="loqii-drawer-header">
