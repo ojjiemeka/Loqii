@@ -2018,6 +2018,24 @@ const APP_FLAG_DEFAULTS = {
   enable_reconnect_debug: false,
 };
 
+let appConfigDegraded = false;
+let appConfigDegradedReason = "";
+
+function getSafeDefaultAppFlags() {
+  return normalizeAppFeatureFlags({});
+}
+
+function markConfigDegraded(reason = "Backend config unavailable") {
+  appConfigDegraded = true;
+  appConfigDegradedReason = reason;
+  window._appConfigDegraded = true;
+  window._appConfigDegradedReason = reason;
+}
+
+function isConfigDegraded() {
+  return appConfigDegraded === true;
+}
+
 function normalizeAppFeatureFlags(flags = {}) {
   return {
     ...APP_FLAG_DEFAULTS,
@@ -2082,13 +2100,15 @@ async function refreshFeatureFlags() {
     if (!res.ok) throw new Error(`app-config ${res.status}`);
     const data = await res.json();
     const nextFlags = data.app_flags || data.feature_flags || {};
+    if (data.degraded === true) markConfigDegraded(data.degraded_reason || "Backend config unavailable");
     applyAppFeatureFlags(nextFlags);
     window._isDevAccount = data.is_dev_account === true;
     window._appFlagEnvironment = data.environment || "user";
     return window._featureFlags;
   } catch (err) {
     console.warn("[FEATURE FLAGS] refresh failed closed:", err.message);
-    applyAppFeatureFlags(window._featureFlags || {});
+    markConfigDegraded("Backend feature flags unavailable");
+    applyAppFeatureFlags(getSafeDefaultAppFlags());
     return window._featureFlags;
   }
 }
@@ -2096,6 +2116,7 @@ async function refreshFeatureFlags() {
 window.getFeatureFlag = (key, fallback = false) => getFeatureFlag(window._featureFlags, key, fallback);
 window.isFeatureEnabled = isFeatureEnabled;
 window.refreshFeatureFlags = refreshFeatureFlags;
+window.isConfigDegraded = isConfigDegraded;
 
 function setLoqiiTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -2199,11 +2220,15 @@ async function bootstrapApp() {
   }
   // Apply config
   GCP_SERVER_URL            = config.gcp_server_url;
-  applyAppFeatureFlags(config.feature_flags || {});
+  if (config.degraded === true) {
+    markConfigDegraded(config.degraded_reason || "Backend config unavailable");
+    console.warn("[BOOTSTRAP] Backend config unavailable; using local development defaults.");
+  }
+  applyAppFeatureFlags(config.app_flags || config.feature_flags || getSafeDefaultAppFlags());
   window._creditPacks       = config.credit_packs       || [];
   window._burnRate          = config.burn_rate          || 2.18;
   window._freeCreditsSignup = config.free_credits_on_signup || 6;
-  console.log('[APP] Bootstrap complete - GCP:', GCP_SERVER_URL, '| flags:', Object.keys(window._featureFlags).length);
+  console.log('[APP] Bootstrap complete - backend:', GCP_SERVER_URL || "unavailable", '| flags:', Object.keys(window._featureFlags).length, '| degraded:', isConfigDegraded() ? "yes" : "no");
   _setBootstrapProgress(100);
   hideBootstrapLoading();
   return true;

@@ -316,12 +316,14 @@ Responsibility:
 - Never store or expose Decart API keys beyond the token response needed by the SDK.
 - Validate local proxy runtime config before production boot.
 - Fail closed when bootstrap config is unavailable in production.
+- In development, backend bootstrap failure enters degraded mode with safe local feature defaults instead of blocking login.
 
 Debug checklist:
 - Normal users must continue to receive production Decart routing from GCP.
 - Dev/test routing decisions remain owned by `gcp-server.js`.
 - `BOOTSTRAP_SECRET`, `INTERNAL_SECRET`, and `GCP_SERVER_URL` are environment-owned; do not add literal fallback secrets.
 - Renderer code consumes `/api/config` and `/api/app-config`; it does not own production config truth.
+- Degraded development config must never fake Decart tokens, billing, session ping, or credit sync endpoints.
 
 ## Production Config Ownership
 
