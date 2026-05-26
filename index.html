@@ -3516,7 +3516,7 @@ function openMockTopupModal() {
 window.loqiiOpenAddCredits = openAddCreditsModal;
 
 //  Per-second credit deduction 
-const SYNC_INTERVAL_SEC = 10;
+const SYNC_INTERVAL_SEC = 5;
 
 async function waitForCreditSyncToSettle(maxWaitMs = 5000) {
   const started = Date.now();
@@ -3568,7 +3568,7 @@ async function tickCredit() {
     addCenterAlert("credits", `Low credits: ${Math.floor(localCredits)} remaining (${secsLeft}s)`);
   }
 
-  // GCP sync every 10 seconds
+  // GCP sync every 5 seconds
   const unsyncedSec = sessionSecondsTotal - lastSyncedSeconds;
   if (unsyncedSec >= SYNC_INTERVAL_SEC && !_creditSyncInProgress && !_finalSyncInProgress) {
     _creditSyncInProgress = true;
