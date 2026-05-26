@@ -1865,7 +1865,7 @@ function formatPrice(value) {
 }
 
 function isMockPaymentsEnabled() {
-  return getFeatureFlag(window._featureFlags, "enable_mock_payments", false) ||
+  return isFeatureEnabled("enable_mock_payments", false) ||
     window._featureFlags?.mock_payments === true;
 }
 
@@ -1880,19 +1880,19 @@ function isLocalDevMode() {
 }
 
 function isDevMode() {
-  return getFeatureFlag(window._featureFlags, "enable_dev_tools", false) || isLocalDevMode();
+  return isFeatureEnabled("enable_dev_tools", false) || isLocalDevMode();
 }
 
 function canShowDiagnostics() {
   return isDevMode() ||
-    getFeatureFlag(window._featureFlags, "enable_advanced_diagnostics", false);
+    isFeatureEnabled("enable_advanced_diagnostics", false);
 }
 
 function canShowDebugPanels(kind = "any") {
   if (isDevMode() || canShowDiagnostics()) return true;
-  if (kind === "prompt") return getFeatureFlag(window._featureFlags, "enable_prompt_debug", false);
-  if (kind === "session") return getFeatureFlag(window._featureFlags, "enable_session_debug", false);
-  if (kind === "performance") return getFeatureFlag(window._featureFlags, "enable_performance_metrics", false);
+  if (kind === "prompt") return isFeatureEnabled("enable_prompt_debug", false);
+  if (kind === "session") return isFeatureEnabled("enable_session_debug", false);
+  if (kind === "performance") return isFeatureEnabled("enable_performance_metrics", false);
   return false;
 }
 
@@ -1985,15 +1985,20 @@ const APP_FLAG_DEFAULTS = {
   enable_google_oauth: false,
   enable_scene_engine: true,
   enable_style_engine: true,
+  enable_background_mode: true,
   enable_new_modals: true,
   enable_advanced_diagnostics: false,
   enable_help_center: true,
   enable_mock_payments: false,
+  enable_real_payments: false,
+  enable_topup_flow: true,
   enable_dev_tools: false,
   enable_light_mode: true,
   enable_performance_metrics: false,
   enable_prompt_debug: false,
   enable_session_debug: false,
+  enable_oauth_debug: false,
+  enable_reconnect_debug: false,
 };
 
 function normalizeAppFeatureFlags(flags = {}) {
@@ -2001,18 +2006,79 @@ function normalizeAppFeatureFlags(flags = {}) {
     ...APP_FLAG_DEFAULTS,
     ...flags,
     enable_mock_payments: flags.enable_mock_payments ?? flags.mock_payments ?? APP_FLAG_DEFAULTS.enable_mock_payments,
+    enable_background_mode: flags.enable_background_mode ?? flags.enable_background ?? APP_FLAG_DEFAULTS.enable_background_mode,
+    enable_style_engine: flags.enable_style_engine ?? flags.enable_style_mode ?? APP_FLAG_DEFAULTS.enable_style_engine,
   };
+}
+
+function isFeatureEnabled(key, fallback = false) {
+  return getFeatureFlag(window._featureFlags, key, fallback);
+}
+
+function setFeatureSurfaceVisible(selector, visible) {
+  document.querySelectorAll(selector).forEach((el) => {
+    el.style.display = visible ? "" : "none";
+  });
+}
+
+function updateFeatureGatedSurfaces() {
+  const helpEnabled = isFeatureEnabled("enable_help_center", true);
+  const topupEnabled = isFeatureEnabled("enable_topup_flow", true);
+  const sceneEnabled = isFeatureEnabled("enable_scene_engine", true);
+  const backgroundEnabled = isFeatureEnabled("enable_background_mode", true);
+  const styleEnabled = isFeatureEnabled("enable_style_engine", true);
+  const lightModeEnabled = isFeatureEnabled("enable_light_mode", true);
+
+  if (btnHelpHdr) btnHelpHdr.style.display = helpEnabled ? "" : "none";
+  if (btnTopupHdr) btnTopupHdr.style.display = topupEnabled ? "" : "none";
+  setFeatureSurfaceVisible('[data-panel="scenes"], #btn-scene-apply, #btn-scene-reset', sceneEnabled);
+  setFeatureSurfaceVisible('[data-panel="background"], #mode-bg', backgroundEnabled);
+  setFeatureSurfaceVisible('[data-panel="style"], #mode-style', styleEnabled);
+  setFeatureSurfaceVisible('[data-theme-choice="light"]', lightModeEnabled);
+  if (!lightModeEnabled && document.body?.dataset?.theme === "light") setLoqiiTheme("dark");
+  const activePanel = document.querySelector(".workspace-tab.active")?.dataset?.panel;
+  if ((activePanel === "scenes" && !sceneEnabled) ||
+      (activePanel === "background" && !backgroundEnabled) ||
+      (activePanel === "style" && !styleEnabled)) {
+    setWorkspacePanel("workspace");
+  }
 }
 
 function applyAppFeatureFlags(flags = {}) {
   window._featureFlags = normalizeAppFeatureFlags(flags);
-  if (btnHelpHdr) btnHelpHdr.style.display = getFeatureFlag(window._featureFlags, "enable_help_center", true) ? "" : "none";
   if (btnSettingsHdr) btnSettingsHdr.style.display = "";
   if (document.body) {
     document.body.dataset.devTools = isDevMode() ? "1" : "0";
   }
+  updateFeatureGatedSurfaces();
   updateDevOnlyVisibility();
+  renderSettingsSections();
 }
+
+async function refreshFeatureFlags() {
+  try {
+    let accessToken = null;
+    if (window.tzurah?.getAccessToken) accessToken = await window.tzurah.getAccessToken().catch(() => null);
+    const headers = { "Cache-Control": "no-store" };
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    const res = await fetch("http://localhost:3000/api/app-config", { cache: "no-store", headers });
+    if (!res.ok) throw new Error(`app-config ${res.status}`);
+    const data = await res.json();
+    const nextFlags = data.app_flags || data.feature_flags || {};
+    applyAppFeatureFlags(nextFlags);
+    window._isDevAccount = data.is_dev_account === true;
+    window._appFlagEnvironment = data.environment || "user";
+    return window._featureFlags;
+  } catch (err) {
+    console.warn("[FEATURE FLAGS] refresh failed closed:", err.message);
+    applyAppFeatureFlags(window._featureFlags || {});
+    return window._featureFlags;
+  }
+}
+
+window.getFeatureFlag = (key, fallback = false) => getFeatureFlag(window._featureFlags, key, fallback);
+window.isFeatureEnabled = isFeatureEnabled;
+window.refreshFeatureFlags = refreshFeatureFlags;
 
 function setLoqiiTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -2149,6 +2215,7 @@ if (!ok) return; // error overlay shown - do nothing further
         avatar_url: session.avatar_url   || null,
       }),
     }).catch(e => console.warn("[PROFILE] ensure-profile failed:", e.message));
+    refreshFeatureFlags().then(applyFeatureFlags).catch(() => {});
   }).catch(() => {});
 
   btnTopupHdr.addEventListener("click", openAddCreditsModal);
@@ -2552,7 +2619,7 @@ function openSettingsDrawer() {
 }
 
 function openHelpDrawer() {
-  if (!getFeatureFlag(window._featureFlags, "enable_help_center", true)) {
+  if (!isFeatureEnabled("enable_help_center", true)) {
     LoqiiToast("Help Center is disabled by admin.", { level: "warning" });
     return;
   }
@@ -3397,6 +3464,10 @@ function buildCreditPackCards(packs) {
 
 async function openAddCreditsModal() {
   if (!isElectron) return;
+  if (!isFeatureEnabled("enable_topup_flow", true)) {
+    LoqiiToast("Add Credits is temporarily unavailable.", { level: "warning" });
+    return;
+  }
   document.querySelectorAll(".loqii-credit-shell").forEach((el) => el.closest(".loqii-overlay")?.remove());
   const mockMode = isMockPaymentsEnabled();
   const packs = await loadCreditPacksForModal();
@@ -5171,11 +5242,11 @@ let onboardingStep = 0;
 
 async function checkOnboarding() {
   if (!isElectron) return;
-  if (!getFeatureFlag(window._featureFlags, "show_onboarding", true)) return;
-  if (getFeatureFlag(window._featureFlags, "onboarding_dev_only", false) && !getFeatureFlag(window._featureFlags, "enable_dev_tools", false)) return;
+  if (!isFeatureEnabled("show_onboarding", true)) return;
+  if (isFeatureEnabled("onboarding_dev_only", false) && !isFeatureEnabled("enable_dev_tools", false)) return;
   try {
     const done = await window.tzurah.getPreference("onboarding_completed", "false");
-    if (done !== "true" || getFeatureFlag(window._featureFlags, "onboarding_required", false)) showOnboarding();
+    if (done !== "true" || isFeatureEnabled("onboarding_required", false)) showOnboarding();
   } catch (e) {
     console.error("[ONBOARDING] Failed to check preference:", e.message);
   }
@@ -5232,17 +5303,27 @@ function applyFeatureFlags(flags) {
     document.getElementById("btn-record")?.remove();
     document.getElementById("btn-record-action")?.remove();
   }
-  if (!flags.enable_background) document.getElementById("mode-bg")?.remove();
+  const backgroundMode = document.getElementById("mode-bg");
+  if (backgroundMode) backgroundMode.style.display = flags.enable_background_mode ? "" : "none";
   if (flags.enable_auto_prompt) {
     const florenceRow = document.getElementById("florence-row");
     if (florenceRow) florenceRow.style.display = "flex";
   } else {
-    document.getElementById("florence-row")?.remove();
+    const florenceRow = document.getElementById("florence-row");
+    if (florenceRow) florenceRow.style.display = "none";
   }
   if (flags.maintenance_mode) showMaintenanceBanner(); else hideMaintenanceBanner();
 }
 
 async function loadFeatureFlags() {
+  try {
+    const refreshed = await refreshFeatureFlags();
+    featureFlags = refreshed;
+    applyFeatureFlags(featureFlags);
+    return;
+  } catch (err) {
+    console.warn("[FEATURE FLAGS] Resolved app-config load failed:", err.message);
+  }
   try {
     // Use bootstrap flags when available  avoids a redundant GCP fetch
     if (window._featureFlags && Object.keys(window._featureFlags).length > 0) {

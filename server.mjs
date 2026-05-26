@@ -356,6 +356,30 @@ function buildApp() {
   });
 
   // ── /mock/purchase — proxy to GCP (localhost-only, Electron test mode) ──
+  app.get("/api/app-config", async (req, res) => {
+    if (!appConfig) return res.status(503).json({ error: "Config not loaded yet - GCP may be unreachable" });
+    try {
+      const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
+      const headers = { "Content-Type": "application/json", "Cache-Control": "no-store" };
+      if (req.headers.authorization) headers.Authorization = req.headers.authorization;
+      const gcpRes = await fetch(`${gcpUrl}/api/app-config`, {
+        headers,
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!gcpRes.ok) throw new Error(`GCP app config failed: ${gcpRes.status}`);
+      return res.json(await gcpRes.json());
+    } catch (err) {
+      console.warn("[APP CONFIG] Falling back to bootstrap flags:", err.message);
+      return res.json({
+        ok: false,
+        feature_flags: appConfig.feature_flags || {},
+        app_flags: appConfig.feature_flags || {},
+        is_dev_account: false,
+        environment: "bootstrap_fallback",
+      });
+    }
+  });
+
   app.post("/mock/purchase", async (req, res) => {
     try {
       const gcpUrl = (appConfig?.gcp_server_url) || process.env.GCP_SERVER_URL || "http://34.39.83.195:4000";

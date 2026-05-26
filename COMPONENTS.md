@@ -246,6 +246,19 @@ Debug checklist:
 - Confirm dark mode text uses semantic tokens rather than hardcoded black text.
 - If feature flag fetch fails, experimental features should default off while core login/start/stop remains usable.
 
+### App Feature Flag Consumption
+
+Owner:
+- Resolved flag fetch: `server.mjs` `/api/app-config` proxy.
+- Runtime state/helpers: `index.html` `refreshFeatureFlags()`, `isFeatureEnabled()`, and `window._featureFlags`.
+- Auth screen consumption: `login.html` and `signup.html` read resolved bootstrap flags for Google OAuth.
+
+Rules:
+- Loqii consumes resolved booleans from Tzurah-AI; it does not decide allowlist/dev-account membership locally.
+- Feature fetch failure fails closed for diagnostics, mock payments, and experimental controls while leaving login/start/stop usable.
+- New app features must check `isFeatureEnabled(key)` instead of reading scattered raw flag objects.
+- No user-facing debug, prompt/session internals, fake metrics, or test payment paths appear without an explicit resolved flag.
+
 Permanent user/dev mode rules:
 - No developer scaffolding is visible in user mode.
 - No fake, static, or placeholder metrics are shown as live product data.

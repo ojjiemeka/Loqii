@@ -60,6 +60,8 @@ The product roadmap must not become a scratchpad. Add only durable product, rele
 - Required diagnostic flags: `enable_dev_tools`, `enable_advanced_diagnostics`, `enable_performance_metrics`, `enable_prompt_debug`, and `enable_session_debug`.
 - Admin/server flags and app fallback names must stay documented together before beta release.
 
+Status: Phase 8D adds the admin-owned app flag control plane and Loqii resolved-flag consumption. Remaining beta work is manual QA of each flag path with normal, dev-account, and allowlisted users.
+
 ## Beta Blockers
 
 - Manual verification of Google OAuth callback on a clean Windows machine.

@@ -274,7 +274,8 @@
       const res = await fetch("http://localhost:3000/api/config", { cache: "no-store" });
       if (!res.ok) throw new Error("config unavailable");
       const data = await res.json();
-      const backendValue = data.feature_flags?.enable_google_oauth;
+      const flags = data.app_flags || data.feature_flags || {};
+      const backendValue = flags.enable_google_oauth;
 
       if (backendValue === true) {
         console.log("[FLAGS] enable_google_oauth = true, source = backend");
