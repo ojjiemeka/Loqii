@@ -74,11 +74,11 @@ contextBridge.exposeInMainWorld("tzurah", {
 
   // ── Windows ─────────────────────────────────────────────────────
 
-  /** Opens the top-up (credit purchase) modal window. */
+  /** Opens the Add Credits surface in the main app window. */
   openTopup: () =>
     ipcRenderer.invoke("app:openTopup"),
 
-  /** Opens the account dashboard modal window. */
+  /** Opens the unified Account surface in the main app window. */
   openDashboard: () =>
     ipcRenderer.invoke("app:openDashboard"),
 

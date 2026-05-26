@@ -12,8 +12,8 @@
       --loqii-muted: #606D5D;
       --loqii-green: #3F6C51;
       --bg:        var(--loqii-ink);
-      --surface:   rgba(1,22,39,.94);
-      --surface2:  rgba(247,243,227,.055);
+      --surface:   var(--loqii-ink);
+      --surface2:  rgba(96,109,93,.16);
       --border:    rgba(96,109,93,.34);
       --text:      var(--loqii-paper);
       --muted:     rgba(247,243,227,.68);
@@ -23,7 +23,7 @@
       --red:       var(--loqii-coral);
       --orange:    var(--loqii-coral);
       --app-bg: var(--bg);
-      --surface-elevated: var(--surface);
+      --surface-elevated: var(--surface2);
       --surface-muted: var(--surface2);
       --text-primary: var(--text);
       --text-secondary: var(--muted);
@@ -36,8 +36,10 @@
     }
     body[data-theme="light"] {
       --bg: var(--loqii-paper);
-      --surface: rgba(247,243,227,.96);
+      --surface: var(--loqii-paper);
       --surface2: rgba(96,109,93,.09);
+      --surface-elevated: var(--surface2);
+      --surface-muted: var(--surface2);
       --border: rgba(96,109,93,.32);
       --text: var(--loqii-ink);
       --muted: rgba(1,22,39,.66);
@@ -85,7 +87,7 @@
 
     /* Profile card */
     .profile-card {
-      background: var(--surface); border: 1px solid var(--border);
+      background: var(--surface-elevated); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 18px 16px;
       display: flex; align-items: center; gap: 14px;
     }
@@ -109,7 +111,7 @@
 
     /* Credits banner */
     .credits-card {
-      background: var(--surface); border: 1px solid var(--border);
+      background: var(--surface-elevated); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 16px;
       display: flex; flex-direction: column; gap: 8px;
     }
@@ -121,7 +123,7 @@
       text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
     }
     .credits-value {
-      font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; color: var(--green);
+      font-size: 2rem; font-weight: 800; letter-spacing: 0; color: var(--green);
     }
     .credits-value.low   { color: var(--orange); }
     .credits-value.empty { color: var(--red); }
@@ -131,7 +133,7 @@
       align-self: flex-start;
       padding: 7px 14px;
       font-size: 0.8rem; font-weight: 700; font-family: inherit;
-      border: none; border-radius: 6px;
+      border: 1px solid var(--accent-primary); border-radius: 6px;
       background: var(--accent-primary);
       color: var(--loqii-paper); cursor: pointer;
       transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
@@ -147,7 +149,7 @@
 
     /* Info card rows */
     .info-card {
-      background: var(--surface); border: 1px solid var(--border);
+      background: var(--surface-elevated); border: 1px solid var(--border);
       border-radius: var(--radius); overflow: hidden;
     }
     .row {
@@ -185,14 +187,14 @@
       white-space: nowrap; transition: all .15s; flex-shrink: 0;
     }
     .btn-ghost {
-      background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+      background: var(--surface-muted); color: var(--text-secondary); border: 1px solid var(--border);
     }
     .btn-ghost:hover { color: var(--text-primary); border-color: var(--accent-primary); }
     .btn-danger {
-      background: rgba(201,112,100,.12); color: var(--red);
-      border: 1px solid rgba(201,112,100,.32);
+      background: var(--surface-muted); color: var(--accent-danger);
+      border: 1px solid var(--accent-danger);
     }
-    .btn-danger:hover { background: rgba(201,112,100,.2); border-color: var(--red); }
+    .btn-danger:hover { border-color: var(--accent-danger); }
 
     .ver { text-align: center; font-size: 0.68rem; color: var(--muted); }
 
@@ -225,11 +227,11 @@
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-<body>
+<body data-theme="light">
 <script>
-  window.tzurah?.getPreference?.("loqii-theme", "dark")
+  window.tzurah?.getPreference?.("loqii-theme", "light")
     .then((theme) => { document.body.dataset.theme = theme === "light" ? "light" : "dark"; })
-    .catch(() => { document.body.dataset.theme = "dark"; });
+    .catch(() => { document.body.dataset.theme = "light"; });
 </script>
 
 <div class="titlebar">

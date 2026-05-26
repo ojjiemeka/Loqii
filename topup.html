@@ -12,8 +12,8 @@
       --loqii-muted: #606D5D;
       --loqii-green: #3F6C51;
       --bg:        var(--loqii-ink);
-      --surface:   rgba(1,22,39,.94);
-      --surface2:  rgba(247,243,227,.055);
+      --surface:   var(--loqii-ink);
+      --surface2:  rgba(96,109,93,.16);
       --field:     rgba(247,243,227,.07);
       --border:    rgba(96,109,93,.34);
       --text:      var(--loqii-paper);
@@ -24,7 +24,7 @@
       --red:       var(--loqii-coral);
       --orange:    var(--loqii-coral);
       --app-bg: var(--bg);
-      --surface-elevated: var(--surface);
+      --surface-elevated: var(--surface2);
       --surface-muted: var(--surface2);
       --text-primary: var(--text);
       --text-secondary: var(--muted);
@@ -37,8 +37,10 @@
     }
     body[data-theme="light"] {
       --bg: var(--loqii-paper);
-      --surface: rgba(247,243,227,.96);
+      --surface: var(--loqii-paper);
       --surface2: rgba(96,109,93,.09);
+      --surface-elevated: var(--surface2);
+      --surface-muted: var(--surface2);
       --field: rgba(247,243,227,.98);
       --border: rgba(96,109,93,.32);
       --text: var(--loqii-ink);
@@ -100,7 +102,7 @@
       text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
     }
     .balance-value {
-      font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em;
+      font-size: 1.6rem; font-weight: 800; letter-spacing: 0;
       color: var(--green);
     }
     .balance-value.low    { color: var(--orange); }
@@ -122,6 +124,7 @@
     }
     .pack-card {
       background: var(--surface-elevated); border: 1px solid var(--border);
+      color: var(--text-primary);
       border-radius: var(--radius);
       padding: 14px 12px;
       display: flex; flex-direction: column; gap: 6px;
@@ -129,13 +132,13 @@
       transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
       user-select: none;
     }
-    .pack-card:hover    { border-color: rgba(63,108,81,.55); background: var(--surface-muted); }
+    .pack-card:hover    { border-color: var(--accent-primary); background: var(--surface-muted); }
     .pack-card.selected {
-      border-color: var(--accent);
+      border-color: var(--accent-primary);
       background: var(--surface-muted);
-      box-shadow: 0 0 0 1px var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-primary);
     }
-    .pack-card.popular  { border-color: rgba(63,108,81,.44); }
+    .pack-card.popular  { border-color: var(--border); }
     .popular-badge {
       position: absolute; top: -1px; right: 10px;
       font-size: 0.58rem; font-weight: 800;
@@ -145,25 +148,32 @@
       padding: 2px 7px;
     }
     .pack-name {
-      font-size: 0.75rem; font-weight: 700; color: var(--muted);
+      font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);
       text-transform: uppercase; letter-spacing: 0.06em;
     }
     .pack-time {
-      font-size: 1.25rem; font-weight: 800; letter-spacing: -0.03em;
+      font-size: 1.25rem; font-weight: 800; letter-spacing: 0;
+      color: var(--text-primary);
     }
-    .pack-time span { font-size: 0.72rem; font-weight: 500; color: var(--muted); }
-    .pack-credits { font-size: 0.72rem; color: var(--muted); }
+    .pack-time span { font-size: 0.72rem; font-weight: 500; color: var(--text-secondary); }
+    .pack-credits { font-size: 0.72rem; color: var(--text-secondary); }
     .pack-price {
-      font-size: 0.95rem; font-weight: 700; color: var(--accent);
+      font-size: 0.95rem; font-weight: 700; color: var(--accent-primary);
       margin-top: 2px;
     }
-    .pack-per { font-size: 0.65rem; color: var(--muted); }
+    .pack-per { font-size: 0.65rem; color: var(--text-muted); }
 
-    /* Checkout button */
+    /* Checkout buttons */
+    .checkout-actions {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: stretch;
+    }
     .btn-checkout {
       width: 100%; padding: 13px;
       font-size: 0.9rem; font-weight: 700; font-family: inherit;
-      border: none; border-radius: 8px;
+      border: 1px solid var(--accent-primary); border-radius: 8px;
       background: var(--accent-primary);
       color: var(--loqii-paper); cursor: pointer;
       transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
@@ -173,6 +183,19 @@
       box-shadow: 0 0 20px var(--accent-glow);
     }
     .btn-checkout:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-secondary {
+      padding: 13px 16px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      font-family: inherit;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--surface-elevated);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      transition: all .15s;
+    }
+    .btn-secondary:hover { color: var(--text-primary); border-color: var(--accent-primary); }
 
     .spinner {
       display: inline-block; width: 14px; height: 14px;
@@ -184,8 +207,8 @@
 
     .err-msg {
       display: none; font-size: 0.78rem;
-      background: rgba(201,112,100,.12); color: var(--text-danger);
-      border: 1px solid rgba(201,112,100,.32);
+      background: var(--surface-muted); color: var(--accent-danger);
+      border: 1px solid var(--accent-danger);
       border-radius: 6px; padding: 9px 12px;
     }
     .err-msg.visible { display: block; }
@@ -200,8 +223,8 @@
     /* Mock mode */
     .mock-banner {
       display: none; padding: 9px 14px; border-radius: 8px;
-      background: rgba(201,112,100,.12); border: 1px solid rgba(201,112,100,.4);
-      color: var(--orange); font-size: 0.78rem; font-weight: 600;
+      background: var(--surface-muted); border: 1px solid var(--accent-danger);
+      color: var(--text-primary); font-size: 0.78rem; font-weight: 600;
       text-align: center; line-height: 1.4;
     }
     .mock-banner.visible { display: block; }
@@ -209,25 +232,25 @@
       width: 100%; margin-top: 6px; padding: 7px;
       font-size: 0.75rem; font-weight: 700; font-family: inherit;
       border-radius: 6px; cursor: pointer;
-      background: rgba(201,112,100,.13); color: var(--orange);
-      border: 1px solid rgba(201,112,100,.42);
+      background: var(--surface-muted); color: var(--accent-danger);
+      border: 1px solid var(--accent-danger);
       transition: all .15s;
     }
-    .btn-mock:hover:not(:disabled) { background: rgba(201,112,100,.2); }
+    .btn-mock:hover:not(:disabled) { border-color: var(--accent-danger); }
     .btn-mock:disabled { opacity: .4; cursor: not-allowed; }
     .success-msg {
       display: none; padding: 10px 14px; border-radius: 8px;
-      background: rgba(63,108,81,.14); border: 1px solid rgba(63,108,81,.36);
-      color: var(--green); font-size: 0.82rem; font-weight: 600; text-align: center;
+      background: var(--surface-muted); border: 1px solid var(--accent-primary);
+      color: var(--accent-primary); font-size: 0.82rem; font-weight: 600; text-align: center;
     }
     .success-msg.visible { display: block; }
   </style>
 </head>
-<body>
+<body data-theme="light">
 <script>
-  window.tzurah?.getPreference?.("loqii-theme", "dark")
+  window.tzurah?.getPreference?.("loqii-theme", "light")
     .then((theme) => { document.body.dataset.theme = theme === "light" ? "light" : "dark"; })
-    .catch(() => { document.body.dataset.theme = "dark"; });
+    .catch(() => { document.body.dataset.theme = "light"; });
 </script>
 
 <div class="titlebar">
@@ -250,7 +273,7 @@
       <div class="balance-value" id="balance-val">--</div>
       <div class="balance-time" id="balance-time"></div>
     </div>
-    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,.4)" stroke-width="1.4">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--accent-primary)" stroke-width="1.4">
       <circle cx="12" cy="12" r="10"/>
       <path d="M12 6v6l4 2"/>
     </svg>
@@ -265,9 +288,12 @@
   <div class="success-msg" id="success-msg"></div>
   <div class="err-msg" id="err-msg"></div>
 
-  <button class="btn-checkout" id="btn-checkout" disabled>
-    Select a pack to continue
-  </button>
+  <div class="checkout-actions">
+    <button class="btn-secondary" id="btn-cancel" type="button">Cancel</button>
+    <button class="btn-checkout" id="btn-checkout" type="button" disabled>
+      Select a pack to continue
+    </button>
+  </div>
 
   <div class="note">
     Payments are processed securely via Stripe.<br>
@@ -283,6 +309,7 @@
   const GCP = "http://34.39.83.195:4000";
 
   document.getElementById("btn-close").addEventListener("click", () => window.close());
+  document.getElementById("btn-cancel").addEventListener("click", () => window.close());
   document.getElementById("link-support").addEventListener("click", (e) => {
     e.preventDefault();
     r.openExternal("mailto:support@tzurah.ai");
@@ -348,20 +375,26 @@
         <div class="pack-credits">${pack.credits} credits</div>
         <div class="pack-price">$${pack.price_usd}</div>
         <div class="pack-per">$${perMin}/min</div>
-        ${mockMode ? `<button class="btn-mock" data-pack-id="${pack.id}">Mock Buy</button>` : ""}
       `;
       card.addEventListener("click", (e) => {
-        if (e.target.closest(".btn-mock")) return;
         selectPack(pack, card);
       });
-      if (mockMode) {
-        card.querySelector(".btn-mock")?.addEventListener("click", (e) => {
-          e.stopPropagation();
-          doMockBuy(pack);
-        });
-      }
       container.appendChild(card);
     });
+  }
+
+  function updateCheckoutLabel(pack) {
+    const btn = document.getElementById("btn-checkout");
+    if (!pack) {
+      btn.disabled = true;
+      btn.textContent = "Select a pack to continue";
+      return;
+    }
+    const mins = Math.round(pack.credits / 130.8);
+    btn.disabled = false;
+    btn.textContent = mockMode
+      ? `Mock Buy - ${pack.credits} credits (${mins} min)`
+      : `Continue to Payment - $${pack.price_usd} (${mins} min)`;
   }
 
   function selectPack(pack, cardEl) {
@@ -369,10 +402,7 @@
     document.querySelectorAll(".pack-card").forEach((c) =>
       c.classList.toggle("selected", c === cardEl)
     );
-    const btn = document.getElementById("btn-checkout");
-    btn.disabled = false;
-    const mins = Math.round(pack.credits / 130.8);
-    btn.textContent = `Pay $${pack.price_usd} - ${pack.credits} credits (${mins} min)`;
+    updateCheckoutLabel(pack);
   }
 
   async function doMockBuy(pack) {
@@ -381,15 +411,16 @@
     successEl.className = "success-msg";
     errEl.className     = "err-msg";
 
-    // Disable all mock buttons
-    document.querySelectorAll(".btn-mock").forEach(b => b.disabled = true);
+    const checkoutBtn = document.getElementById("btn-checkout");
+    checkoutBtn.disabled = true;
+    checkoutBtn.textContent = "Processing...";
 
     const result = await r.mockPurchase(pack.id);
-    document.querySelectorAll(".btn-mock").forEach(b => b.disabled = false);
 
     if (result.error) {
       errEl.textContent = result.error;
       errEl.className   = "err-msg visible";
+      updateCheckoutLabel(pack);
       return;
     }
 
@@ -397,8 +428,7 @@
     successEl.className   = "success-msg visible";
     selectedPack = null;
     document.querySelectorAll(".pack-card").forEach(c => c.classList.remove("selected"));
-    document.getElementById("btn-checkout").disabled = true;
-    document.getElementById("btn-checkout").textContent = "Select a pack to continue";
+    updateCheckoutLabel(null);
     loadBalance();
     setTimeout(() => window.close(), 2000);
   }
@@ -422,8 +452,7 @@
   r.on("payment:success", () => {
     loadBalance();
     document.getElementById("err-msg").className = "err-msg";
-    document.getElementById("btn-checkout").disabled = true;
-    document.getElementById("btn-checkout").textContent = "Select a pack to continue";
+    updateCheckoutLabel(null);
     selectedPack = null;
     document.querySelectorAll(".pack-card").forEach(c => c.classList.remove("selected"));
   });
@@ -433,6 +462,10 @@
     const btn = document.getElementById("btn-checkout");
     const err = document.getElementById("err-msg");
     err.className = "err-msg";
+    if (mockMode) {
+      await doMockBuy(selectedPack);
+      return;
+    }
     btn.disabled  = true;
     btn.innerHTML = `<span class="spinner"></span>Opening Stripe...`;
 
@@ -440,9 +473,7 @@
     if (result.error) {
       err.textContent = result.error;
       err.className   = "err-msg visible";
-      btn.disabled    = false;
-      const mins = Math.round(selectedPack.credits / 130.8);
-      btn.textContent = `Pay $${selectedPack.price_usd} - ${selectedPack.credits} credits (${mins} min)`;
+      updateCheckoutLabel(selectedPack);
     }
   });
 

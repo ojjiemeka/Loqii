@@ -17,7 +17,7 @@ function injectModalStyles() {
     .loqii-overlay {
       position: fixed; inset: 0; z-index: 9800;
       display: flex; align-items: center; justify-content: center;
-      padding: 20px; background: var(--overlay, rgba(1,22,39,.72));
+      padding: 20px; background: var(--overlay);
       backdrop-filter: blur(8px);
     }
     .loqii-modal {
@@ -26,28 +26,28 @@ function injectModalStyles() {
       display: flex; flex-direction: column; overflow: hidden;
       border: 1px solid var(--border);
       border-radius: 12px;
-      background: var(--surface-elevated, var(--surface));
-      color: var(--text-primary, var(--text));
+      background: var(--surface-elevated);
+      color: var(--text-primary);
       box-shadow: 0 28px 80px var(--shadow);
     }
     .loqii-modal-header {
       flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
     }
-    .loqii-modal-title { font-size: .92rem; font-weight: 850; color: var(--text-primary, var(--text)); }
+    .loqii-modal-title { font-size: .92rem; font-weight: 850; color: var(--text-primary); }
     .loqii-modal-close {
       width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
-      background: var(--surface-muted, var(--surface2)); color: var(--text-muted, var(--muted)); cursor: pointer; font: inherit;
+      background: var(--surface); color: var(--text-muted); cursor: pointer; font: inherit;
     }
-    .loqii-modal-close:hover { color: var(--text-primary, var(--text)); border-color: var(--accent-primary, var(--loqii-green)); }
+    .loqii-modal-close:hover { color: var(--text-primary); border-color: var(--accent-primary); }
     .loqii-modal-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 15px 16px; color: var(--text-secondary, var(--muted)); line-height: 1.55;
+      padding: 15px 16px; color: var(--text-secondary); line-height: 1.55;
     }
-    .loqii-modal-body strong { color: var(--text-primary, var(--text)); }
+    .loqii-modal-body strong { color: var(--text-primary); }
     .loqii-modal-input {
       width: 100%; margin-top: 10px; padding: 9px 10px; border-radius: 7px;
-      border: 1px solid var(--border); background: var(--field, var(--surface-muted)); color: var(--text-primary, var(--text));
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-primary);
       font: inherit; outline: none;
     }
     .loqii-modal-footer {
@@ -56,29 +56,93 @@ function injectModalStyles() {
     }
     .loqii-btn {
       border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px;
-      background: var(--surface-muted, var(--surface2)); color: var(--text-primary, var(--text)); cursor: pointer;
+      background: var(--surface); color: var(--text-primary); cursor: pointer;
       font: inherit; font-size: .78rem; font-weight: 800;
     }
-    .loqii-btn:hover { border-color: var(--accent-primary, var(--loqii-green)); box-shadow: 0 0 14px rgba(63,108,81,.10); }
-    .loqii-btn-primary { background: var(--accent-primary, var(--loqii-green)); border-color: var(--accent-primary, var(--loqii-green)); color: var(--loqii-paper); }
-    .loqii-btn-danger { background: rgba(201,112,100,.14); border-color: var(--accent-danger, var(--loqii-coral)); color: var(--text-danger, var(--loqii-coral)); }
+    .loqii-btn:disabled { opacity: .48; cursor: not-allowed; box-shadow: none; }
+    .loqii-btn:hover { border-color: var(--accent-primary); box-shadow: 0 0 14px var(--accent-glow); }
+    .loqii-btn-primary { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--loqii-paper); }
+    .loqii-btn-danger { background: var(--surface); border-color: var(--accent-danger); color: var(--accent-danger); }
+    .loqii-btn-secondary { background: var(--surface); color: var(--text-secondary); }
     .loqii-empty, .loqii-loading {
       border: 1px dashed var(--border); border-radius: 9px; padding: 18px;
-      text-align: center; color: var(--text-muted, var(--muted)); background: var(--surface-muted, var(--surface2));
+      text-align: center; color: var(--text-muted); background: var(--surface);
     }
     .loqii-section {
-      border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted, var(--surface2));
+      border: 1px solid var(--border); border-radius: 9px; background: var(--surface);
       padding: 11px; margin-bottom: 10px;
     }
     .loqii-section-title {
-      color: var(--text-primary, var(--text)); font-size: .74rem; font-weight: 850; margin-bottom: 7px;
+      color: var(--text-primary); font-size: .74rem; font-weight: 850; margin-bottom: 7px;
       text-transform: uppercase; letter-spacing: .06em;
     }
-    .loqii-section-copy { color: var(--text-secondary, var(--muted)); font-size: .76rem; line-height: 1.5; }
+    .loqii-section-copy { color: var(--text-secondary); font-size: .76rem; line-height: 1.5; }
     .loqii-loading::before {
       content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px;
       border: 2px solid rgba(247,243,227,.22); border-top-color: var(--loqii-green);
       border-radius: 50%; animation: loqiiSpin .8s linear infinite; vertical-align: -2px;
+    }
+    .loqii-credit-shell {
+      background: var(--surface);
+      color: var(--text-primary);
+    }
+    .loqii-credit-shell .loqii-modal-body { color: var(--text-primary); }
+    .loqii-credit-modal { display: flex; flex-direction: column; gap: 12px; color: var(--text-primary); }
+    .loqii-credit-balance {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px; border: 1px solid var(--border); border-radius: 9px;
+      background: var(--surface-elevated);
+    }
+    .loqii-credit-label {
+      color: var(--text-muted); font-size: .64rem; font-weight: 850;
+      letter-spacing: .06em; text-transform: uppercase;
+    }
+    .loqii-credit-value { color: var(--accent-primary); font-size: 1.5rem; font-weight: 900; }
+    .loqii-credit-time { color: var(--text-secondary); font-size: .74rem; margin-top: 2px; }
+    .loqii-credit-warning {
+      padding: 10px 12px; border: 1px solid var(--accent-danger); border-radius: 9px;
+      background: var(--surface-elevated); color: var(--text-primary);
+      font-size: .78rem; font-weight: 750; line-height: 1.45;
+    }
+    .loqii-credit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .loqii-pack-card {
+      min-height: 138px; display: flex; flex-direction: column; gap: 6px; text-align: left;
+      padding: 12px; border: 1px solid var(--border); border-radius: 9px;
+      background: var(--surface-elevated); color: var(--text-primary);
+      cursor: pointer; font: inherit; transition: border-color .16s, background .16s, box-shadow .16s;
+    }
+    .loqii-pack-card:hover { border-color: var(--accent-primary); }
+    .loqii-pack-card.selected {
+      border-color: var(--accent-primary);
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--accent-primary);
+    }
+    .loqii-pack-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .loqii-pack-name {
+      color: var(--text-secondary); font-size: .66rem; font-weight: 900;
+      letter-spacing: .06em; text-transform: uppercase;
+    }
+    .loqii-pack-badge {
+      color: var(--accent-primary); font-size: .58rem; font-weight: 900;
+      letter-spacing: .06em; text-transform: uppercase;
+    }
+    .loqii-pack-minutes { color: var(--text-primary); font-size: 1.28rem; font-weight: 900; }
+    .loqii-pack-minutes span { color: var(--text-secondary); font-size: .72rem; font-weight: 700; }
+    .loqii-pack-meta { color: var(--text-muted); font-size: .72rem; }
+    .loqii-pack-price { margin-top: auto; color: var(--accent-primary); font-size: .94rem; font-weight: 900; }
+    .loqii-credit-message {
+      min-height: 18px; color: var(--text-secondary); font-size: .76rem; line-height: 1.45;
+    }
+    .loqii-credit-message.success { color: var(--accent-primary); }
+    .loqii-credit-message.error { color: var(--accent-danger); }
+    .loqii-credit-actions {
+      display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px;
+    }
+    .loqii-credit-actions .loqii-btn { min-width: 132px; }
+    @media (max-width: 620px) {
+      .loqii-credit-grid { grid-template-columns: 1fr; }
+      .loqii-credit-actions { flex-direction: column-reverse; }
+      .loqii-credit-actions .loqii-btn { width: 100%; }
     }
     @keyframes loqiiSpin { to { transform: rotate(360deg); } }
   `;
@@ -105,6 +169,8 @@ export function LoqiiModal(options = {}) {
     input = false,
     defaultValue = "",
     width = 520,
+    showFooter = true,
+    className = "",
   } = options;
 
   return new Promise((resolve) => {
@@ -113,7 +179,7 @@ export function LoqiiModal(options = {}) {
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.innerHTML = `
-      <section class="loqii-modal" style="width:min(${Number(width) || 520}px,100%)">
+      <section class="loqii-modal ${escapeHtml(className)}" style="width:min(${Number(width) || 520}px,100%)">
         <header class="loqii-modal-header">
           <div class="loqii-modal-title">${escapeHtml(title)}</div>
           ${cancelable ? `<button class="loqii-modal-close" type="button" data-loqii-cancel aria-label="Close">x</button>` : ""}
@@ -122,10 +188,10 @@ export function LoqiiModal(options = {}) {
           ${typeof body === "string" ? body : ""}
           ${input ? `<input class="loqii-modal-input" data-loqii-input type="text" value="${escapeHtml(defaultValue)}">` : ""}
         </div>
-        <footer class="loqii-modal-footer">
+        ${showFooter ? `<footer class="loqii-modal-footer">
           ${cancelable ? `<button class="loqii-btn" type="button" data-loqii-cancel>${escapeHtml(cancelLabel)}</button>` : ""}
           <button class="loqii-btn loqii-btn-primary ${danger ? "loqii-btn-danger" : ""}" type="button" data-loqii-confirm>${escapeHtml(confirmLabel)}</button>
-        </footer>
+        </footer>` : ""}
       </section>`;
     document.body.appendChild(overlay);
 
@@ -137,7 +203,7 @@ export function LoqiiModal(options = {}) {
     const onKey = (event) => {
       if (!document.body.contains(overlay)) return document.removeEventListener("keydown", onKey);
       if (event.key === "Escape" && cancelable) finish(false);
-      if (event.key === "Enter" && !event.shiftKey && event.target?.tagName !== "TEXTAREA") finish(true);
+      if (event.key === "Enter" && showFooter && !event.shiftKey && event.target?.tagName !== "TEXTAREA") finish(true);
     };
     document.addEventListener("keydown", onKey);
     overlay.addEventListener("click", (event) => { if (event.target === overlay && cancelable) finish(false); });

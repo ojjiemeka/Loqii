@@ -197,7 +197,7 @@ Debug checklist:
 - If feature flag fetch fails, experimental features should default off while core login/start/stop remains usable.
 
 Modal/drawer theme audit:
-- Migrated: Account drawer, Settings drawer, Help drawer, mock top-up modal, top-up window, account dashboard window, dashboard sign-out confirm, native camera/audio selects.
+- Migrated: unified Account drawer, unified Add Credits modal, Settings drawer, Help drawer, top-up fallback window, account dashboard fallback window, dashboard sign-out confirm, native camera/audio selects.
 - Already shared: keyboard shortcuts, onboarding, generic alerts/confirms/prompts, mock top-up flow.
 - Still legacy but reachable: session summary, admin kill summary, OBS setup, Florence download. These use Loqii palette variables but keep specialized fixed layouts.
 - Conditional reachability: admin kill summary requires a server kill signal; Florence download requires the auto-describe flag.

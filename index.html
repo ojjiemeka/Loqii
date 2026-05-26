@@ -58,6 +58,8 @@
       --surface: rgba(1,22,39,.88);
       --surface2: rgba(247,243,227,.045);
       --surface3: rgba(96,109,93,.16);
+      --surface-elevated: var(--surface3);
+      --surface-muted: var(--surface2);
       --field: rgba(247,243,227,.065);
       --bar: rgba(1,22,39,.98);
       --border: rgba(96,109,93,.28);
@@ -89,6 +91,8 @@
       --surface: var(--loqii-paper);
       --surface2: rgba(96,109,93,.08);
       --surface3: rgba(96,109,93,.13);
+      --surface-elevated: var(--surface2);
+      --surface-muted: var(--surface2);
       --field: rgba(247,243,227,.92);
       --bar: rgba(247,243,227,.96);
       --border: rgba(96,109,93,.26);
@@ -1511,7 +1515,7 @@
     <button id="btn-obs"      class="btn-hdr-ghost btn-obs"      type="button" disabled>OBS</button>
     <button id="btn-portrait" class="btn-hdr-ghost" type="button" title="Toggle Portrait/Landscape mode">Landscape</button>
     <button id="btn-record"   class="btn-hdr-ghost btn-hdr-record" type="button" disabled>Record</button>
-    <button id="btn-topup-hdr"     class="btn-hdr-accent" type="button">Top-up</button>
+    <button id="btn-topup-hdr"     class="btn-hdr-accent" type="button">Add Credits</button>
     <button id="btn-settings-hdr"  class="btn-hdr-ghost"  type="button">Settings</button>
     <button id="btn-help-hdr"      class="btn-hdr-ghost"  type="button">Help</button>
     <button id="btn-dashboard-hdr" class="btn-hdr-ghost"  type="button">Account</button>
@@ -1827,6 +1831,38 @@ window.showModalAlert = showModalAlert;
 window.showModalConfirm = showModalConfirm;
 window.showModalPrompt = showModalPrompt;
 
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatCreditsValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n).toLocaleString() : "--";
+}
+
+function formatPurchaseDate(ts) {
+  if (!ts) return "--";
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "Gift";
+  return `$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
+}
+
+function isMockPaymentsEnabled() {
+  return getFeatureFlag(window._featureFlags, "enable_mock_payments", false) ||
+    window._featureFlags?.mock_payments === true;
+}
+
 //  DOM 
 const inputVideo    = document.getElementById("input-video");
 const outputVideo   = document.getElementById("output-video");
@@ -2062,10 +2098,7 @@ if (!ok) return; // error overlay shown - do nothing further
     }).catch(e => console.warn("[PROFILE] ensure-profile failed:", e.message));
   }).catch(() => {});
 
-  btnTopupHdr.addEventListener("click", async () => {
-    if (window._featureFlags?.mock_payments === true) { openMockTopupModal(); return; }
-    window.tzurah.openTopup();
-  });
+  btnTopupHdr.addEventListener("click", openAddCreditsModal);
   btnDashHdr.addEventListener("click",  openAccountDrawer);
   btnSettingsHdr?.addEventListener("click", openSettingsDrawer);
   btnHelpHdr?.addEventListener("click", openHelpDrawer);
@@ -2397,24 +2430,141 @@ function openHelpDrawer() {
   LoqiiDrawer({ title: "Help Center", body: buildHelpMarkup(), width: 560 });
 }
 
-function openAccountDrawer() {
-  const body = `
-    <section class="loqii-section">
-      <div class="loqii-section-title">Account</div>
-      <div class="loqii-section-copy">Manage account details, purchases, and dashboard views.</div>
-    </section>
-    <section class="loqii-section">
-      <div class="loqii-section-title">Credits</div>
-      <div class="loqii-section-copy">Current balance: <strong>${hdrCreditsVal?.textContent || "--"}</strong></div>
-    </section>
-    <section class="loqii-section loqii-drawer-actions">
-      <button id="drawer-dashboard-btn" class="loqii-btn loqii-btn-primary" type="button">Open Dashboard</button>
-      <button id="drawer-topup-btn" class="loqii-btn" type="button">Buy Credits</button>
-    </section>`;
-  LoqiiDrawer({ title: "Account", body, width: 460 });
-  document.getElementById("drawer-dashboard-btn")?.addEventListener("click", () => window.tzurah.openDashboard());
-  document.getElementById("drawer-topup-btn")?.addEventListener("click", () => window.tzurah.openTopup());
+function buildAccountDrawerBody() {
+  return `
+    <div class="loqii-account" id="account-drawer-panel">
+      <div class="loqii-account-summary" id="account-summary">
+        <article class="loqii-account-card loqii-account-profile">
+          <div class="loqii-account-avatar">?</div>
+          <div style="min-width:0">
+            <div class="loqii-account-title">User Profile</div>
+            <div class="loqii-account-value">Loading...</div>
+            <div class="loqii-account-meta">Checking account details</div>
+          </div>
+        </article>
+        <article class="loqii-account-card">
+          <div class="loqii-account-title">Credits Remaining</div>
+          <div class="loqii-account-value accent">${escapeHtml(hdrCreditsVal?.textContent || "--")}</div>
+          <div class="loqii-account-meta">${escapeHtml(hdrCreditsTime?.textContent || "")}</div>
+        </article>
+        <article class="loqii-account-card">
+          <div class="loqii-account-title">Credits Used Total</div>
+          <div class="loqii-account-value">--</div>
+          <div class="loqii-account-meta">Lifetime usage</div>
+        </article>
+        <article class="loqii-account-card">
+          <div class="loqii-account-title">Account Status</div>
+          <div class="loqii-account-value">Loading</div>
+          <div class="loqii-account-meta">Secure session check</div>
+        </article>
+      </div>
+      <div class="loqii-account-actions">
+        <button id="account-dashboard-btn" class="loqii-btn" type="button">Open Dashboard</button>
+        <button id="account-add-credits-btn" class="loqii-btn loqii-btn-primary" type="button">Add Credits</button>
+        <button id="account-signout-btn" class="loqii-btn loqii-btn-danger" type="button">Sign Out</button>
+      </div>
+      <section class="loqii-account-history" aria-label="Purchase History">
+        <div class="loqii-account-history-head">
+          <div>Purchase History</div>
+          <div style="text-align:right">Credits</div>
+          <div style="text-align:right">Amount</div>
+        </div>
+        <div id="account-purchases-list">${LoqiiLoadingState("Loading purchase history...")}</div>
+      </section>
+    </div>`;
 }
+
+function renderAccountSummary(session, balance, info) {
+  const summary = document.getElementById("account-summary");
+  if (!summary) return;
+  const credits = typeof balance?.credits === "number" ? balance.credits : session?.credits_remaining;
+  const totalUsed = typeof session?.total_credits_used === "number" ? session.total_credits_used : 0;
+  const name = session?.display_name || session?.email || "Loqii user";
+  const email = session?.email || "No email on file";
+  const initial = escapeHtml((name || email || "L").trim().charAt(0).toUpperCase() || "L");
+  const avatar = session?.avatar_url
+    ? `<img src="${escapeHtml(session.avatar_url)}" alt="">`
+    : initial;
+  const status = session?.user_id ? "Active" : "Signed out";
+  const statusMeta = info?.version ? `Loqii v${escapeHtml(info.version)}` : "Loqii account";
+  summary.innerHTML = `
+    <article class="loqii-account-card loqii-account-profile">
+      <div class="loqii-account-avatar">${avatar}</div>
+      <div style="min-width:0">
+        <div class="loqii-account-title">User Profile</div>
+        <div class="loqii-account-value">${escapeHtml(name)}</div>
+        <div class="loqii-account-meta">${escapeHtml(email)}</div>
+      </div>
+    </article>
+    <article class="loqii-account-card">
+      <div class="loqii-account-title">Credits Remaining</div>
+      <div class="loqii-account-value accent">${formatCreditsValue(credits)}</div>
+      <div class="loqii-account-meta">${typeof credits === "number" && credits > 0 ? `~ ${escapeHtml(creditsToTime(credits))} available` : "No available time"}</div>
+    </article>
+    <article class="loqii-account-card">
+      <div class="loqii-account-title">Credits Used Total</div>
+      <div class="loqii-account-value">${formatCreditsValue(totalUsed)}</div>
+      <div class="loqii-account-meta">Lifetime usage</div>
+    </article>
+    <article class="loqii-account-card">
+      <div class="loqii-account-title">Account Status</div>
+      <div class="loqii-account-value">${escapeHtml(status)}</div>
+      <div class="loqii-account-meta">${statusMeta}</div>
+    </article>`;
+}
+
+function renderAccountPurchases(purchases) {
+  const list = document.getElementById("account-purchases-list");
+  if (!list) return;
+  if (!Array.isArray(purchases) || purchases.length === 0) {
+    list.innerHTML = LoqiiEmptyState("No purchases yet.");
+    return;
+  }
+  list.innerHTML = purchases.slice(0, 10).map((p) => `
+    <div class="loqii-account-purchase">
+      <div>
+        <div class="loqii-account-purchase-name">${escapeHtml(p.pack_name || "Credit pack")}</div>
+        <div class="loqii-account-purchase-date">${escapeHtml(formatPurchaseDate(p.created_at))}</div>
+      </div>
+      <div class="loqii-account-purchase-credits">+${formatCreditsValue(p.credits_added)} credits</div>
+      <div class="loqii-account-purchase-price">${formatPrice(p.price_usd)}</div>
+    </div>`).join("");
+}
+
+async function hydrateAccountDrawer() {
+  const [session, info, balance, purchaseResult] = await Promise.all([
+    window.tzurah.getSession().catch(() => null),
+    window.tzurah.appInfo ? window.tzurah.appInfo().catch(() => null) : Promise.resolve(null),
+    window.tzurah.getBalance().catch(() => null),
+    window.tzurah.getPurchases ? window.tzurah.getPurchases().catch(() => ({ purchases: [] })) : Promise.resolve({ purchases: [] }),
+  ]);
+  if (!document.getElementById("account-drawer-panel")) return;
+  renderAccountSummary(session, balance, info);
+  renderAccountPurchases(purchaseResult?.purchases || []);
+}
+
+function openAccountDrawer() {
+  const drawer = LoqiiDrawer({ title: "Account", body: buildAccountDrawerBody(), width: 680 });
+  document.getElementById("account-dashboard-btn")?.addEventListener("click", () => {
+    setWorkspacePanel("workspace");
+    drawer.close();
+  });
+  document.getElementById("account-add-credits-btn")?.addEventListener("click", openAddCreditsModal);
+  document.getElementById("account-signout-btn")?.addEventListener("click", async () => {
+    const ok = await LoqiiConfirm("Sign out of Loqii?", {
+      title: "Confirm sign out",
+      confirmLabel: "Sign Out",
+      danger: true,
+    });
+    if (ok) await window.tzurah.logout();
+  });
+  hydrateAccountDrawer().catch(() => {
+    renderAccountPurchases([]);
+    LoqiiToast("Account details could not be refreshed.", { level: "warning" });
+  });
+}
+
+window.loqiiOpenAccount = openAccountDrawer;
 
 subscribeSessionState((state) => {
   const description = describeSessionState(state);
@@ -2998,7 +3148,7 @@ function updateCreditsAlerts(credits) {
   else if (c <= 30) newLevel = 1;
   else              newLevel = 0;
 
-  // Reset level when credits go up (gift/topup)
+  // Reset level when credits go up (gift/Add Credits)
   if (newLevel < _creditAlertLevel) _creditAlertLevel = newLevel;
 
   if (newLevel > _creditAlertLevel) {
@@ -3009,7 +3159,7 @@ function updateCreditsAlerts(credits) {
         log("Out of credits - session stopped.", "error");
         doStop().then(() => {
           setStatus("error", "No credits");
-          setTimeout(() => window.tzurah?.openTopup(), 1000);
+          setTimeout(() => openAddCreditsModal(), 1000);
         });
       }
     } else if (newLevel === 2) {
@@ -3061,77 +3211,169 @@ if (isElectron) {
   });
 }
 
-//  Mock Top-up Modal (shown when mock_payments flag is active) 
-async function openMockTopupModal() {
-  // Use bootstrapped credit packs; fall back to GCP fetch if not loaded yet
+async function loadCreditPacksForModal() {
   let packs = (window._creditPacks || []).filter(p => p.is_active !== false);
   if (!packs.length) {
     try {
       const data = await fetch(`${GCP_SERVER_URL}/api/credit-packs`).then(r => r.json());
       packs = (data?.packs || data || []).filter(p => p.is_active !== false);
-    } catch (e) { console.error("[MOCK TOPUP] Failed to load packs:", e); }
+    } catch (e) {
+      console.error("[ADD CREDITS] Failed to load packs:", e);
+    }
   }
+  if (!packs.length) {
+    packs = [
+      { id: "starter", name: "Starter", price_usd: 20, credits: 42, is_popular: false },
+      { id: "basic", name: "Basic", price_usd: 35, credits: 72, is_popular: false },
+      { id: "standard", name: "Standard", price_usd: 60, credits: 132, is_popular: true },
+      { id: "pro", name: "Pro", price_usd: 100, credits: 216, is_popular: false },
+      { id: "ultra", name: "Ultra", price_usd: 200, credits: 450, is_popular: false },
+      { id: "max", name: "Max", price_usd: 500, credits: 1200, is_popular: false },
+    ];
+  }
+  return packs;
+}
 
-  const packCards = packs.length ? packs.map(p => {
-    const totalSec = Math.round((p.credits || 0) / (window._burnRate || 2.18));
-    const m = Math.floor(totalSec / 60), s = totalSec % 60;
-    const timeStr = m > 0 ? `${m}m${s ? " " + s + "s" : ""}` : `${s}s`;
-    const isPopular = p.is_popular === true;
-    const popularBadge = isPopular
-      ? `<span style="color:var(--text-success);font-size:10px;font-weight:800;text-transform:uppercase">Popular</span>`
-      : '';
-    return `<div class="loqii-section" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-      <div style="min-width:0">
-        <div style="font-weight:800;color:var(--text-primary)">${p.name} ${popularBadge}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${p.credits} cr &middot; ~${timeStr}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-weight:800;color:var(--text-success)">$${p.price_usd}</span>
-        <button data-pack-id="${p.id}" data-pack-name="${p.name}" data-pack-credits="${p.credits}" class="loqii-btn loqii-btn-danger mock-buy-btn" type="button">Mock Buy</button>
-      </div>
-    </div>`;
-  }).join("") : LoqiiEmptyState("No packs available");
+function formatPackMinutes(credits) {
+  const totalSec = Math.round((Number(credits) || 0) / (window._burnRate || 2.18));
+  return Math.max(1, Math.round(totalSec / 60));
+}
+
+function buildCreditPackCards(packs) {
+  return packs.map((p) => {
+    const minutes = formatPackMinutes(p.credits);
+    return `
+      <button class="loqii-pack-card" type="button" aria-pressed="false" data-pack-id="${escapeHtml(p.id)}">
+        <div class="loqii-pack-top">
+          <div class="loqii-pack-name">${escapeHtml(p.name || "Credit Pack")}</div>
+          ${p.is_popular ? `<div class="loqii-pack-badge">Popular</div>` : ""}
+        </div>
+        <div class="loqii-pack-minutes">${minutes}<span> min</span></div>
+        <div class="loqii-pack-meta">${formatCreditsValue(p.credits)} credits</div>
+        <div class="loqii-pack-price">${formatPrice(p.price_usd)}</div>
+      </button>`;
+  }).join("");
+}
+
+async function openAddCreditsModal() {
+  if (!isElectron) return;
+  document.querySelectorAll(".loqii-credit-shell").forEach((el) => el.closest(".loqii-overlay")?.remove());
+  const mockMode = isMockPaymentsEnabled();
+  const packs = await loadCreditPacksForModal();
+  let selectedPack = null;
+  const balanceText = escapeHtml(hdrCreditsVal?.textContent || "--");
+  const balanceTime = escapeHtml((hdrCreditsTime?.textContent || "").replace(/[()]/g, ""));
 
   LoqiiModal({
-    title: "Test Mode - Mock Payments",
-    body: `<div class="loqii-section-copy" style="margin-bottom:10px">Credits are added instantly. No real charge is made.</div><div id="mock-topup-msg"></div>${packCards}`,
-    confirmLabel: "Close",
-    cancelable: false,
-    width: 520,
+    title: "Add Credits",
+    body: `
+      <div class="loqii-credit-modal">
+        ${mockMode ? `<div class="loqii-credit-warning">TEST MODE - Mock payments are active. Credits are added instantly without a real charge.</div>` : ""}
+        <section class="loqii-credit-balance">
+          <div>
+            <div class="loqii-credit-label">Credits Remaining</div>
+            <div class="loqii-credit-value" id="credit-modal-balance">${balanceText}</div>
+            <div class="loqii-credit-time" id="credit-modal-time">${balanceTime}</div>
+          </div>
+        </section>
+        <div class="loqii-credit-label">Choose a credit pack</div>
+        <div class="loqii-credit-grid" id="credit-pack-grid">
+          ${packs.length ? buildCreditPackCards(packs) : LoqiiEmptyState("No packs available.")}
+        </div>
+        <div class="loqii-credit-message" id="credit-modal-message">Select a pack to continue.</div>
+        <div class="loqii-credit-actions">
+          <button class="loqii-btn loqii-btn-secondary" type="button" id="credit-cancel-btn">Cancel</button>
+          <button class="loqii-btn loqii-btn-primary" type="button" id="credit-continue-btn" disabled>${mockMode ? "Mock Buy" : "Continue to Payment"}</button>
+        </div>
+      </div>`,
+    cancelable: true,
+    showFooter: false,
+    width: 720,
+    className: "loqii-credit-shell",
   });
-  const ov = document.querySelector(".loqii-overlay");
 
-  ov.querySelectorAll(".mock-buy-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const packId      = btn.dataset.packId;
-      const packName    = btn.dataset.packName;
-      const packCredits = parseInt(btn.dataset.packCredits, 10);
-      const msgEl       = ov.querySelector("#mock-topup-msg");
+  const overlays = document.querySelectorAll(".loqii-overlay");
+  const ov = overlays[overlays.length - 1];
+  if (!ov) return;
+  const msgEl = ov.querySelector("#credit-modal-message");
+  const continueBtn = ov.querySelector("#credit-continue-btn");
+  const closeModal = () => ov.querySelector("[data-loqii-cancel]")?.click();
 
-      ov.querySelectorAll(".mock-buy-btn").forEach(b => b.disabled = true);
-      btn.textContent = "Processing";
+  window.tzurah.getBalance().then(({ credits }) => {
+    if (!document.body.contains(ov) || typeof credits !== "number") return;
+    ov.querySelector("#credit-modal-balance").textContent = formatCreditsValue(credits);
+    ov.querySelector("#credit-modal-time").textContent = credits > 0 ? `~ ${creditsToTime(credits)} remaining` : "No available time";
+  }).catch(() => {});
 
-      const result = await window.tzurah.mockPurchase(packId);
-
-      if (result?.error) {
-        msgEl.innerHTML = `<div class="loqii-section-copy" style="color:var(--text-danger);margin-bottom:8px">${result.error}</div>`;
-        ov.querySelectorAll(".mock-buy-btn").forEach(b => { b.disabled = false; });
-        btn.textContent = "Mock Buy";
-      } else {
-        const added = result?.credits_added ?? packCredits;
-        msgEl.innerHTML = `<div class="loqii-section-copy" style="color:var(--text-success);margin-bottom:8px">Mock purchase successful. +${added} credits added.</div>`;
-        addCenterAlert("gift", `Mock purchase: +${added} cr added! (${packName})`);
-        if (typeof result?.new_balance === "number") {
-          updateCreditsHeader(result.new_balance);
-          updateCreditsAlerts(result.new_balance);
-          hdrCreditsVal.style.animation = "creditFlash 0.8s ease 3";
-          setTimeout(() => { hdrCreditsVal.style.animation = ""; }, 2500);
-        }
-        setTimeout(() => ov?.remove(), 2000);
-      }
+  ov.querySelector("#credit-cancel-btn")?.addEventListener("click", closeModal);
+  ov.querySelectorAll(".loqii-pack-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      selectedPack = packs.find((p) => String(p.id) === card.dataset.packId) || null;
+      ov.querySelectorAll(".loqii-pack-card").forEach((el) => {
+        const isSelected = el === card;
+        el.classList.toggle("selected", isSelected);
+        el.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      });
+      if (!selectedPack) return;
+      const minutes = formatPackMinutes(selectedPack.credits);
+      continueBtn.disabled = false;
+      continueBtn.textContent = mockMode
+        ? `Mock Buy - ${formatCreditsValue(selectedPack.credits)} credits (${minutes} min)`
+        : `Continue to Payment - ${formatPrice(selectedPack.price_usd)} (${minutes} min)`;
+      msgEl.className = "loqii-credit-message";
+      msgEl.textContent = `${selectedPack.name || "Credit pack"} - ${minutes} minutes, ${formatCreditsValue(selectedPack.credits)} credits, ${formatPrice(selectedPack.price_usd)}.`;
     });
   });
+
+  continueBtn?.addEventListener("click", async () => {
+    if (!selectedPack) return;
+    continueBtn.disabled = true;
+    continueBtn.textContent = mockMode ? "Processing..." : "Opening payment...";
+    msgEl.className = "loqii-credit-message";
+    msgEl.textContent = "";
+
+    const result = mockMode
+      ? await window.tzurah.mockPurchase(selectedPack.id)
+      : await window.tzurah.checkout(selectedPack.id);
+
+    if (result?.error) {
+      msgEl.className = "loqii-credit-message error";
+      msgEl.textContent = result.error;
+      continueBtn.disabled = false;
+      const minutes = formatPackMinutes(selectedPack.credits);
+      continueBtn.textContent = mockMode
+        ? `Mock Buy - ${formatCreditsValue(selectedPack.credits)} credits (${minutes} min)`
+        : `Continue to Payment - ${formatPrice(selectedPack.price_usd)} (${minutes} min)`;
+      return;
+    }
+
+    if (mockMode) {
+      const added = result?.credits_added ?? selectedPack.credits;
+      msgEl.className = "loqii-credit-message success";
+      msgEl.textContent = `Mock purchase successful. +${formatCreditsValue(added)} credits added.`;
+      addCenterAlert("gift", `Mock purchase: +${formatCreditsValue(added)} credits added.`);
+      if (typeof result?.new_balance === "number") {
+        updateCreditsHeader(result.new_balance);
+        updateCreditsAlerts(result.new_balance);
+      }
+      hydrateAccountDrawer().catch(() => {});
+      setTimeout(closeModal, 1200);
+      return;
+    }
+
+    msgEl.className = "loqii-credit-message success";
+    msgEl.textContent = "Stripe Checkout opened in your browser.";
+    const minutes = formatPackMinutes(selectedPack.credits);
+    continueBtn.textContent = `Continue to Payment - ${formatPrice(selectedPack.price_usd)} (${minutes} min)`;
+    continueBtn.disabled = false;
+  });
 }
+
+function openMockTopupModal() {
+  return openAddCreditsModal();
+}
+
+window.loqiiOpenAddCredits = openAddCreditsModal;
 
 //  Per-second credit deduction 
 const SYNC_INTERVAL_SEC = 10;
@@ -3277,9 +3519,9 @@ function showSessionSummary(durationSec, creditsUsed, creditsLeft) {
           <span class="summary-stat-value ${leftCls}"> ${creditsToTime(left)}</span>
         </div>
       </div>
-      ${lowCr ? `<div class="summary-low-warning"><span></span> Running low  consider topping up</div>` : ""}
+      ${lowCr ? `<div class="summary-low-warning"><span></span> Running low - consider adding credits</div>` : ""}
       <div class="summary-actions">
-        ${isElectron ? `<button class="summary-btn-topup" id="summary-topup-btn">Buy More Credits</button>` : ""}
+        ${isElectron ? `<button class="summary-btn-topup" id="summary-topup-btn">Add Credits</button>` : ""}
         <button class="summary-btn-close" id="summary-close-btn">Close</button>
       </div>
       <div class="summary-autodismiss" id="summary-countdown">Auto-closing in 30s</div>
@@ -3291,7 +3533,7 @@ function showSessionSummary(durationSec, creditsUsed, creditsLeft) {
   document.getElementById("summary-close-btn").addEventListener("click", closeSummary);
   if (isElectron) {
     document.getElementById("summary-topup-btn").addEventListener("click", () => {
-      window.tzurah.openTopup();
+      openAddCreditsModal();
       closeSummary();
     });
   }
@@ -3569,7 +3811,7 @@ btnStart.addEventListener("click", async () => {
       const minimumToStart = (window._burnRate || 2.18) * 10; // 10 seconds minimum
       if (!credits || credits < minimumToStart) {
         log("Not enough credits to start. Opening top-up...", "warning");
-        window.tzurah.openTopup();
+        openAddCreditsModal();
         addCenterAlert("error", `Not enough credits to start. Minimum: ${Math.ceil(minimumToStart)} credits`);
         btnStart.disabled = false;
         _startInProgress = false;
@@ -4669,8 +4911,8 @@ document.addEventListener("keydown", (e) => {
   }
   if (e.code === "Delete" && !e.ctrlKey) { clearSlot(activeSlotIndex); return; }
   if ((e.ctrlKey || e.metaKey) && e.code === "KeyM") { e.preventDefault(); if (isElectron) window.tzurah.minimize(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.code === "KeyD") { e.preventDefault(); if (isElectron) window.tzurah.openDashboard(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.code === "KeyB") { e.preventDefault(); if (isElectron) window.tzurah.openTopup(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.code === "KeyD") { e.preventDefault(); if (isElectron) openAccountDrawer(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.code === "KeyB") { e.preventDefault(); if (isElectron) openAddCreditsModal(); return; }
   if (e.code === "Slash" && e.shiftKey) { showKeyboardShortcuts(); return; }
 });
 
@@ -4686,7 +4928,7 @@ function showKeyboardShortcuts() {
       <div><div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Identities</div>
         ${row("1-5","Select slot")}${row("Delete","Clear active slot")}
         <div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 8px">App</div>
-        ${row("Ctrl+M","Minimize")}${row("Ctrl+D","Dashboard")}${row("Ctrl+B","Buy credits")}${row("Shift+?","Shortcuts")}
+        ${row("Ctrl+M","Minimize")}${row("Ctrl+D","Account")}${row("Ctrl+B","Add credits")}${row("Shift+?","Shortcuts")}
       </div>
     </div>`,
     confirmLabel: "Close",

@@ -9,8 +9,8 @@
  * Window flow:
  *   Not logged in  login.html (480640, loadFile)
  *   Logged in      index.html (1440900, loadURL via local Express)
- *   Top-up modal   topup.html (900700, loadFile)
- *   Dashboard      dashboard.html (600700, loadFile)
+ *   Account        unified drawer in index.html
+ *   Add Credits    themed modal in index.html
  */
 
 "use strict";
@@ -63,8 +63,6 @@ app.setName("Loqii");
 
 //  State 
 let mainWin      = null;
-let topupWin     = null;
-let dashboardWin = null;
 let tray         = null;
 let expressServer = null;
 let serverModule  = null;
@@ -215,14 +213,10 @@ function handleDeepLink(rawUrl) {
     BrowserWindow.getAllWindows().forEach((w) => {
       if (!w.isDestroyed()) w.webContents.send("payment:success");
     });
-    if (topupWin && !topupWin.isDestroyed()) topupWin.close();
     return;
   }
 
-  // tzurah://payment/cancel  just close topup window
-  if (parsed.hostname === "payment" && parsed.pathname.includes("cancel")) {
-    if (topupWin && !topupWin.isDestroyed()) topupWin.close();
-  }
+  // tzurah://payment/cancel is handled by the browser checkout flow.
 }
 
 //  Token helpers (safeStorage encryption) 
@@ -378,7 +372,7 @@ function ensureMainWin() {
     minHeight:       500,
     frame:           false,
     titleBarStyle:   "hidden",
-    backgroundColor: "#0a0a0f",
+    backgroundColor: "#011627",
     icon:            path.join(__dirname, "assets", "Tzurah_logo.png"),
     webPreferences: {
       preload:          path.join(__dirname, "preload.js"),
@@ -425,48 +419,41 @@ function showMainApp() {
   mainWin.once("ready-to-show", () => mainWin.show());
 }
 
+function runMainAppSurface(commandName) {
+  if (!db.getSession()) {
+    showLoginScreen();
+    return;
+  }
+
+  const command = `window.${commandName}?.()`;
+  const isLoadedMainApp = mainWin && !mainWin.isDestroyed() &&
+    mainWin.webContents.getURL().startsWith(`http://localhost:${PORT}`);
+
+  const execute = () => {
+    if (!mainWin || mainWin.isDestroyed()) return;
+    if (mainWin.isMinimized()) mainWin.restore();
+    mainWin.show();
+    mainWin.focus();
+    mainWin.webContents.executeJavaScript(command).catch((err) => {
+      console.warn(`[UI] Could not run ${commandName}:`, err.message);
+    });
+  };
+
+  if (!isLoadedMainApp) {
+    showMainApp();
+    mainWin.webContents.once("did-finish-load", () => setTimeout(execute, 100));
+    return;
+  }
+
+  execute();
+}
+
 function openTopup() {
-  if (topupWin && !topupWin.isDestroyed()) { topupWin.focus(); return; }
-  topupWin = new BrowserWindow({
-    width:           900,
-    height:          700,
-    parent:          mainWin || undefined,
-    modal:           false,
-    frame:           false,
-    backgroundColor: "#0a0a0f",
-    icon:            path.join(__dirname, "assets", "Tzurah_logo.png"),
-    webPreferences: {
-      preload:          path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration:  false,
-    },
-    show: false,
-  });
-  topupWin.loadFile(path.join(__dirname, "topup.html"));
-  topupWin.once("ready-to-show", () => topupWin.show());
-  topupWin.on("closed", () => { topupWin = null; });
+  runMainAppSurface("loqiiOpenAddCredits");
 }
 
 function openDashboard() {
-  if (dashboardWin && !dashboardWin.isDestroyed()) { dashboardWin.focus(); return; }
-  dashboardWin = new BrowserWindow({
-    width:           600,
-    height:          700,
-    parent:          mainWin || undefined,
-    modal:           false,
-    frame:           false,
-    backgroundColor: "#0a0a0f",
-    icon:            path.join(__dirname, "assets", "Tzurah_logo.png"),
-    webPreferences: {
-      preload:          path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration:  false,
-    },
-    show: false,
-  });
-  dashboardWin.loadFile(path.join(__dirname, "dashboard.html"));
-  dashboardWin.once("ready-to-show", () => dashboardWin.show());
-  dashboardWin.on("closed", () => { dashboardWin = null; });
+  runMainAppSurface("loqiiOpenAccount");
 }
 
 //  System tray 
@@ -486,7 +473,7 @@ function buildTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open Loqii", click: () => { if (mainWin && !mainWin.isDestroyed()) mainWin.show(); else showMainApp(); } },
     { type: "separator" },
-    { label: "Dashboard",       click: openDashboard },
+    { label: "Account",         click: openDashboard },
     { label: "Add Credits",     click: openTopup },
     { type: "separator" },
     { label: "Quit Loqii",     click: () => app.quit() },
@@ -527,8 +514,8 @@ function buildAppMenu() {
       { label: "Clear Active Slot", accelerator: "Delete", click: () => js("clearSlot(activeSlotIndex)") },
     ]},
     { label: "Account", submenu: [
-      { label: "My Dashboard", accelerator: "CmdOrCtrl+D", click: () => js("window.tzurah?.openDashboard()") },
-      { label: "Buy Credits",  accelerator: "CmdOrCtrl+B", click: () => js("window.tzurah?.openTopup()") },
+      { label: "My Account",   accelerator: "CmdOrCtrl+D", click: openDashboard },
+      { label: "Add Credits",  accelerator: "CmdOrCtrl+B", click: openTopup },
       { type: "separator" },
       { label: "Sign Out", click: () => js("window.tzurah?.logout()") },
     ]},
@@ -628,12 +615,6 @@ async function gracefulShutdown(reason = "app-quit") {
     forceTimer.unref?.();
 
     await stopRendererSessionForShutdown();
-
-    for (const win of [topupWin, dashboardWin]) {
-      try { if (win && !win.isDestroyed()) win.destroy(); } catch {}
-    }
-    topupWin = null;
-    dashboardWin = null;
 
     if (tray) {
       try { tray.destroy(); } catch {}
@@ -811,8 +792,6 @@ ipcMain.handle("auth:google", async () => {
 ipcMain.handle("auth:logout", async () => {
   await supabase.auth.signOut().catch(() => {});
   db.clearSession();
-  if (topupWin && !topupWin.isDestroyed()) topupWin.close();
-  if (dashboardWin && !dashboardWin.isDestroyed()) dashboardWin.close();
   showLoginScreen();
   buildTrayMenu();
   return { ok: true };

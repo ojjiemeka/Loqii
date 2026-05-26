@@ -79,6 +79,18 @@ app_dest_for() {
   esac
 }
 
+app_source_for() {
+  case "$1" in
+    "README.app.md")
+      if [[ -f "README.app.md" ]]; then echo "README.app.md"; else echo "README.md"; fi
+      ;;
+    "app-repo.gitignore")
+      if [[ -f "app-repo.gitignore" ]]; then echo "app-repo.gitignore"; else echo ".gitignore"; fi
+      ;;
+    *) echo "$1" ;;
+  esac
+}
+
 DRY_RUN=0
 if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN=1
@@ -104,23 +116,27 @@ fi
 
 echo "Approved app source files:"
 for file in "${APP_SOURCE_FILES[@]}"; do
+  source_file=$(app_source_for "$file")
   dest=$(app_dest_for "$file")
   APP_DEST_FILES+=("$dest")
-  if [[ "$file" == "$dest" ]]; then
+  if [[ "$source_file" == "$dest" ]]; then
+    echo "  - $source_file"
+  elif [[ "$file" == "$dest" ]]; then
     echo "  - $file"
   else
-    echo "  - $file -> $dest"
+    echo "  - $source_file -> $dest"
   fi
 done
 echo
 
 echo "Checking source files:"
 for file in "${APP_SOURCE_FILES[@]}"; do
-  if [[ ! -f "$file" ]]; then
-    echo "ERROR: Missing approved app source file: $file"
+  source_file=$(app_source_for "$file")
+  if [[ ! -f "$source_file" ]]; then
+    echo "ERROR: Missing approved app source file: $source_file"
     exit 1
   fi
-  echo "  ok $file"
+  echo "  ok $source_file"
 done
 echo
 
@@ -145,6 +161,15 @@ if [[ ! -d "$APP_SOURCE_DIR/.git" ]]; then
     echo "No files were copied or staged."
     exit 2
   fi
+fi
+
+SOURCE_ROOT=$(pwd -P)
+TARGET_ROOT=$(cd "$APP_SOURCE_DIR" && pwd -P)
+IN_PLACE=0
+if [[ "$SOURCE_ROOT" == "$TARGET_ROOT" ]]; then
+  IN_PLACE=1
+  echo "In-place app repo detected; using the current checkout as source and target."
+  echo
 fi
 
 REMOTE_URL=$(git -C "$APP_SOURCE_DIR" remote get-url origin 2>/dev/null || true)
@@ -179,7 +204,7 @@ else
   git -C "$APP_SOURCE_DIR" pull origin main --rebase --quiet
 fi
 
-if [[ -n "$(git -C "$APP_SOURCE_DIR" status --porcelain)" ]]; then
+if [[ "$IN_PLACE" != "1" && -n "$(git -C "$APP_SOURCE_DIR" status --porcelain)" ]]; then
   echo "ERROR: App source repo has existing changes. Commit/stash/clean it before syncing."
   git -C "$APP_SOURCE_DIR" status --short
   exit 1
@@ -187,10 +212,15 @@ fi
 
 echo "Copying approved app source files:"
 for file in "${APP_SOURCE_FILES[@]}"; do
+  source_file=$(app_source_for "$file")
   dest=$(app_dest_for "$file")
+  if [[ "$IN_PLACE" == "1" ]]; then
+    echo "  in-place $source_file -> $dest"
+    continue
+  fi
   mkdir -p "$APP_SOURCE_DIR/$(dirname "$dest")"
-  cp "$file" "$APP_SOURCE_DIR/$dest"
-  echo "  copy $file -> $APP_SOURCE_DIR/$dest"
+  cp "$source_file" "$APP_SOURCE_DIR/$dest"
+  echo "  copy $source_file -> $APP_SOURCE_DIR/$dest"
 done
 echo
 
@@ -233,12 +263,16 @@ if [[ -n "$SECRET_FILES" ]]; then
 fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
-  echo "Dry run passed. Restoring copied files so the app source repo stays clean."
   git reset --quiet
-  if [[ "$HAS_HEAD" == "1" ]]; then
-    git restore --source=HEAD --worktree -- "${APP_DEST_FILES[@]}" 2>/dev/null || true
+  if [[ "$IN_PLACE" == "1" ]]; then
+    echo "Dry run passed. In-place source files were left unchanged."
   else
-    rm -f -- "${APP_DEST_FILES[@]}"
+    echo "Dry run passed. Restoring copied files so the app source repo stays clean."
+    if [[ "$HAS_HEAD" == "1" ]]; then
+      git restore --source=HEAD --worktree -- "${APP_DEST_FILES[@]}" 2>/dev/null || true
+    else
+      rm -f -- "${APP_DEST_FILES[@]}"
+    fi
   fi
   exit 0
 fi
