@@ -46,11 +46,26 @@ function envValue(name, { required = false, devDefault = null } = {}) {
   return "";
 }
 
+function ensureDevelopmentSecret(name, devValue, generated) {
+  if (process.env[name] && String(process.env[name]).trim()) return;
+  if (!isDevelopment()) return;
+  process.env[name] = devValue;
+  generated.push(name);
+}
+
 function validateElectronConfig() {
   const missing = [];
-  ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "BOOTSTRAP_SECRET", "INTERNAL_SECRET"].forEach((name) => {
+  const generated = [];
+  ensureDevelopmentSecret("BOOTSTRAP_SECRET", "dev-bootstrap-secret", generated);
+  ensureDevelopmentSecret("INTERNAL_SECRET", "dev-internal-secret", generated);
+  ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].forEach((name) => {
     if (!process.env[name]) missing.push(name);
   });
+  if (!isDevelopment()) {
+    ["BOOTSTRAP_SECRET", "INTERNAL_SECRET"].forEach((name) => {
+      if (!process.env[name]) missing.push(name);
+    });
+  }
   const gcpServerUrl = envValue("GCP_SERVER_URL", {
     required: !isDevelopment(),
     devDefault: "http://localhost:4000",
@@ -59,6 +74,7 @@ function validateElectronConfig() {
   if (isProduction() && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(gcpServerUrl)) {
     missing.push("GCP_SERVER_URL(non-local production URL)");
   }
+  if (generated.length) console.log("[CONFIG] Using development-only generated internal secrets");
   if (missing.length) return { ok: false, missing, gcpServerUrl, environment: runtimeEnvironment() };
   return { ok: true, missing: [], gcpServerUrl, environment: runtimeEnvironment() };
 }
