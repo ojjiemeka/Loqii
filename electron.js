@@ -84,6 +84,11 @@ function rendererOAuthPayload(payload = {}) {
   const ok = !(payload.error || payload.error_code);
   return {
     ok,
+    user: ok && payload.user ? {
+      user_id: payload.user.user_id || null,
+      email: payload.user.email || null,
+      display_name: payload.user.display_name || "",
+    } : null,
     error: payload.error || null,
     error_code: payload.error_code || null,
     error_description: ok ? null : safeOAuthDescription(payload),
@@ -162,6 +167,7 @@ function getAutoUpdater() {
 //  Protocol registration 
 // Must be called before app.whenReady() on Windows
 app.setAsDefaultProtocolClient("tzurah");
+app.setAsDefaultProtocolClient("loqii");
 
 //  Single-instance lock + deep-link handler (Windows) 
 if (!app.requestSingleInstanceLock()) {
@@ -172,7 +178,7 @@ if (!app.requestSingleInstanceLock()) {
 app.on("second-instance", (_event, argv) => {
   // On Windows, deep links arrive as a command-line argument in the
   // second instance's argv array.
-  const deepUrl = argv.find((a) => a.startsWith("tzurah://"));
+  const deepUrl = argv.find((a) => a.startsWith("tzurah://") || a.startsWith("loqii://"));
   if (deepUrl) handleDeepLink(deepUrl);
   if (mainWin && !mainWin.isDestroyed()) {
     if (mainWin.isMinimized()) mainWin.restore();
@@ -711,17 +717,19 @@ ipcMain.handle("auth:login", async (_e, email, password) => {
 
 ipcMain.handle("auth:google", async () => {
   try {
+    const oauthRedirectTo = `http://localhost:${PORT}/oauth/callback`;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo:          "tzurah://auth/callback",
+        redirectTo:          oauthRedirectTo,
         skipBrowserRedirect: true,
       },
     });
     if (error || !data.url) return { error: error?.message || "Failed to get OAuth URL" };
 
     // Open OAuth in the system browser and resolve through the existing
-    // tzurah:// deep-link handler. This avoids duplicate Electron app windows.
+    // localhost callback bridge. tzurah:// and loqii:// deep links remain
+    // supported for older Supabase redirect allowlist entries.
     const tokens = await new Promise((resolve, reject) => {
       let settled = false;
       pendingOAuthResolve = (tokens) => {
@@ -768,13 +776,17 @@ ipcMain.handle("auth:google", async () => {
       .eq("id", user.id)
       .single();
 
-    db.saveSession({
+    const sessionSummary = {
       user_id:            user.id,
       email:              user.email,
       display_name:       profile?.display_name || user.user_metadata?.full_name || "",
       avatar_url:         profile?.avatar_url   || user.user_metadata?.avatar_url || null,
       credits_remaining:  profile?.credits      ?? 0,
       total_credits_used: profile?.total_credits_used ?? 0,
+    };
+
+    db.saveSession({
+      ...sessionSummary,
       access_token:       encryptToken(sessionData.session.access_token),
       refresh_token:      encryptToken(sessionData.session.refresh_token),
       last_synced:        Date.now(),
@@ -783,8 +795,8 @@ ipcMain.handle("auth:google", async () => {
     // Ensure Supabase profile row exists for new OAuth users
     ensureProfileForUser(sessionData.session.access_token).catch(() => {});
 
+    sendOAuthResultToAuthWindow({ ok: true, user: sessionSummary });
     showMainApp();
-    sendOAuthResultToAuthWindow({ ok: true });
     return { ok: true, user: db.getSession() };
   } catch (err) {
     if (err.message === "cancelled") return { cancelled: true };

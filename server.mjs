@@ -88,7 +88,7 @@ function oauthCallbackPage(payload = {}) {
   const failed = Boolean(payload.error || payload.error_code);
   const message = failed
     ? `Authentication failed: ${oauthMessageFor(payload)}`
-    : "Authentication received. You can return to Loqii.";
+    : "Authentication complete. You can return to Loqii.";
 
   return `<!doctype html>
 <html lang="en">
@@ -141,9 +141,9 @@ function oauthCallbackPage(payload = {}) {
             ? "Authentication failed: This account is banned."
             : payload.error
               ? "Authentication failed. You can return to Loqii."
-              : "Authentication received. You can return to Loqii.";
+              : "Authentication complete. You can return to Loqii.";
         } catch {
-          document.getElementById("message").textContent = "Authentication received. Return to Loqii to continue.";
+          document.getElementById("message").textContent = "Authentication complete. Return to Loqii to continue.";
         }
       }
     })();

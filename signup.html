@@ -377,6 +377,11 @@
   }
 
   r.on?.("oauth-result", (result) => {
+    if (result?.ok === true) {
+      resetGoogleButton();
+      showMsg("Signed in successfully.", "success");
+      return;
+    }
     if (result?.ok === false) showOAuthError(result);
   });
 
