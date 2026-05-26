@@ -268,7 +268,7 @@
   }
 
   async function resolveGoogleOAuthFlag() {
-    const devMode = isLocalDevBuild() || await isAppDevMode();
+    const devMode = await isAppDevMode();
 
     try {
       const res = await fetch("http://localhost:3000/api/config", { cache: "no-store" });
@@ -290,6 +290,10 @@
       // Fall through to local/dev default while admin flags are being wired.
     }
 
+    if (!devMode) {
+      console.log("[FLAGS] enable_google_oauth = false, source = fail-closed");
+      return { enabled: false, source: "fail-closed", explicitlyDisabled: true };
+    }
     console.log(`[FLAGS] enable_google_oauth = ${LOCAL_AUTH_FLAG_DEFAULTS.enable_google_oauth}, source = dev-default`);
     return {
       enabled: LOCAL_AUTH_FLAG_DEFAULTS.enable_google_oauth,

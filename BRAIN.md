@@ -18,3 +18,4 @@ Short, high-signal lessons only. Add durable rules, not session notes.
 - Feature flags are release gates.
 - Settings is stable config; Dev is experiment control.
 - Persistent modals must declare every close path.
+- Production config fails closed before UI boot.

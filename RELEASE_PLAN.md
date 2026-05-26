@@ -168,6 +168,8 @@ Future option:
 ## Preconditions Before Shipping `.exe`
 
 - App login, credits, Decart token, and start/stop lifecycle verified.
+- Packaged app refuses to boot without production `GCP_SERVER_URL`, `BOOTSTRAP_SECRET`, `INTERNAL_SECRET`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
+- Local proxy bootstrap validates backend config before production listening.
 - Google OAuth verified through system-browser deep link without duplicate Electron windows, or disabled by app feature flag.
 - Help, onboarding, diagnostics, scene/style engines, light mode, mock payments, and developer tools verified behind admin-controlled app flags.
 - Billing reconciliation dashboard healthy or degraded only with understood resolved historical events.

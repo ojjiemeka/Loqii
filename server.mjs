@@ -27,9 +27,65 @@ import { WebSocketServer }  from "ws";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
+function runtimeEnvironment() {
+  const raw = String(process.env.LOQII_ENV || process.env.TZURAH_ENV || process.env.NODE_ENV || "development").toLowerCase();
+  return ["production", "staging", "development"].includes(raw) ? raw : "development";
+}
+
+export function isDevelopment() { return runtimeEnvironment() === "development"; }
+export function isStaging() { return runtimeEnvironment() === "staging"; }
+export function isProduction() { return runtimeEnvironment() === "production"; }
+
+function envValue(name, { required = false, devDefault = null } = {}) {
+  const value = process.env[name];
+  if (value && String(value).trim()) return String(value).trim();
+  if (isDevelopment() && devDefault != null) return devDefault;
+  if (required) throw new Error(`Missing required config: ${name}`);
+  return "";
+}
+
+function validateLocalServerConfig() {
+  const missing = ["BOOTSTRAP_SECRET", "INTERNAL_SECRET"].filter((name) => !process.env[name]);
+  const gcpServerUrl = envValue("GCP_SERVER_URL", {
+    required: true,
+  });
+  if (!/^https?:\/\//i.test(gcpServerUrl)) missing.push("GCP_SERVER_URL(valid URL)");
+  if (isProduction() && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(gcpServerUrl)) {
+    missing.push("GCP_SERVER_URL(non-local production URL)");
+  }
+  if (missing.length) {
+    const error = new Error(`Configuration unavailable: ${missing.join(", ")}`);
+    error.code = "CONFIG_INVALID";
+    throw error;
+  }
+  return {
+    environment: runtimeEnvironment(),
+    gcpServerUrl,
+    bootstrapSecret: envValue("BOOTSTRAP_SECRET", { required: true }),
+    internalSecret: envValue("INTERNAL_SECRET", { required: true }),
+  };
+}
+
+function validateBootstrapPayload(payload) {
+  const missing = [];
+  if (!payload || typeof payload !== "object") missing.push("bootstrap payload");
+  if (!payload?.supabase_url) missing.push("supabase_url");
+  if (!payload?.supabase_anon_key) missing.push("supabase_anon_key");
+  if (!payload?.gcp_server_url) missing.push("gcp_server_url");
+  if (!payload?.feature_flags || typeof payload.feature_flags !== "object") missing.push("feature_flags");
+  if (missing.length) {
+    const error = new Error(`Configuration unavailable: ${missing.join(", ")}`);
+    error.code = "BOOTSTRAP_INVALID";
+    throw error;
+  }
+}
+
+let localServerConfig = validateLocalServerConfig();
+
 // ── Bootstrap config (fetched from GCP, never on disk) ────────────
-const GCP_URL      = process.env.GCP_SERVER_URL || "http://34.39.83.195:4000";
-const APP_SECRET   = process.env.BOOTSTRAP_SECRET || "tzurah-bootstrap-2025-prod";
+const GCP_URL      = localServerConfig.gcpServerUrl;
+const APP_SECRET   = localServerConfig.bootstrapSecret;
+const INTERNAL_SECRET = localServerConfig.internalSecret;
 let appConfig      = null; // in-memory only
 let oauthCallbackHandler = null;
 
@@ -169,6 +225,8 @@ async function fetchBootstrap() {
     });
     if (!res.ok) throw new Error("Bootstrap HTTP " + res.status);
     appConfig = await res.json();
+    validateBootstrapPayload(appConfig);
+    console.log("[BOOTSTRAP] Environment:", runtimeEnvironment());
     console.log("[BOOTSTRAP] Config loaded successfully");
     console.log("[BOOTSTRAP] Supabase URL:", appConfig.supabase_url ? "✅" : "❌");
     console.log("[BOOTSTRAP] Anon key:    ", appConfig.supabase_anon_key ? "✅" : "❌");
@@ -176,7 +234,7 @@ async function fetchBootstrap() {
     console.log("[BOOTSTRAP] Credit packs:", (appConfig.credit_packs || []).length, "packs");
     return true;
   } catch (err) {
-    console.error("[BOOTSTRAP] Failed:", err.message);
+    console.error("[BOOTSTRAP] Failed:", err.code || "BOOTSTRAP_ERROR");
     return false;
   }
 }
@@ -213,9 +271,8 @@ const TOKEN_CACHE_MS = 5 * 60 * 1000; // 5 minutes
 
 async function fetchTokenFromGCP() {
   const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
-  const secret = process.env.INTERNAL_SECRET || "tzurah-internal";
   const gcpRes = await fetch(`${gcpUrl}/internal/decart-key`, {
-    headers: { "x-internal-secret": secret },
+    headers: { "x-internal-secret": INTERNAL_SECRET },
     signal: AbortSignal.timeout(8000),
   });
   if (!gcpRes.ok) throw new Error(`GCP token fetch failed: ${gcpRes.status}`);
@@ -335,8 +392,8 @@ function buildApp() {
       });
 
     } catch (err) {
-      console.error("[DECART TOKEN] Fetch failed:", err.message);
-      return res.status(503).json({ error: err.message });
+      console.error("[DECART TOKEN] Fetch failed:", err.code || err.message);
+      return res.status(503).json({ error: "Service temporarily unavailable" });
     }
   });
 
@@ -381,8 +438,11 @@ function buildApp() {
   });
 
   app.post("/mock/purchase", async (req, res) => {
+    if (isProduction() && !(appConfig?.feature_flags?.enable_mock_payments || appConfig?.feature_flags?.mock_payments)) {
+      return res.status(403).json({ error: "Service temporarily unavailable" });
+    }
     try {
-      const gcpUrl = (appConfig?.gcp_server_url) || process.env.GCP_SERVER_URL || "http://34.39.83.195:4000";
+      const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
       const gcpRes = await fetch(`${gcpUrl}/mock/purchase`, {
         method:  "POST",
         headers: {
@@ -394,8 +454,8 @@ function buildApp() {
       const data = await gcpRes.json();
       return res.status(gcpRes.status).json(data);
     } catch (err) {
-      console.error("[mock/purchase proxy]", err);
-      return res.status(500).json({ error: err.message });
+      console.error("[mock/purchase proxy]", err?.message || err);
+      return res.status(500).json({ error: "Service temporarily unavailable" });
     }
   });
 
@@ -451,6 +511,15 @@ function attachObsWebSocket(httpServer) {
 
 // ── startServer — called by electron.js ───────────────────────────
 export async function startServer(port) {
+  localServerConfig = validateLocalServerConfig();
+  if (isProduction()) {
+    const ok = await bootstrapWithRetry(3);
+    if (!ok) {
+      const error = new Error("Configuration unavailable");
+      error.code = "BOOTSTRAP_UNAVAILABLE";
+      throw error;
+    }
+  }
   // Start listening FIRST so Electron can load index.html immediately.
   // /api/config returns 503 while bootstrap is in progress; bootstrapApp()
   // in index.html retries until it gets a 200.
@@ -472,7 +541,7 @@ export async function startServer(port) {
   attachObsWebSocket(server);
 
   // Bootstrap in background — renderer retries /api/config until ready
-  bootstrapWithRetry(5).catch(() => {});
+  if (!isProduction()) bootstrapWithRetry(5).catch(() => {});
 
   return server;
 }

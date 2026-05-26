@@ -29,36 +29,59 @@ let autoUpdater       = null;
 const db       = require("./db.js");
 const supabase = require("./supabase.js");
 
+function runtimeEnvironment() {
+  const raw = String(process.env.LOQII_ENV || process.env.TZURAH_ENV || process.env.NODE_ENV || (app.isPackaged ? "production" : "development")).toLowerCase();
+  return ["production", "staging", "development"].includes(raw) ? raw : "development";
+}
+
+function isDevelopment() { return runtimeEnvironment() === "development"; }
+function isStaging() { return runtimeEnvironment() === "staging"; }
+function isProduction() { return runtimeEnvironment() === "production"; }
+
+function envValue(name, { required = false, devDefault = null } = {}) {
+  const value = process.env[name];
+  if (value && String(value).trim()) return String(value).trim();
+  if (isDevelopment() && devDefault != null) return devDefault;
+  if (required) throw new Error(`Missing required config: ${name}`);
+  return "";
+}
+
+function validateElectronConfig() {
+  const missing = [];
+  ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "BOOTSTRAP_SECRET", "INTERNAL_SECRET"].forEach((name) => {
+    if (!process.env[name]) missing.push(name);
+  });
+  const gcpServerUrl = envValue("GCP_SERVER_URL", {
+    required: !isDevelopment(),
+    devDefault: "http://localhost:4000",
+  });
+  if (!/^https?:\/\//i.test(gcpServerUrl)) missing.push("GCP_SERVER_URL(valid URL)");
+  if (isProduction() && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(gcpServerUrl)) {
+    missing.push("GCP_SERVER_URL(non-local production URL)");
+  }
+  if (missing.length) return { ok: false, missing, gcpServerUrl, environment: runtimeEnvironment() };
+  return { ok: true, missing: [], gcpServerUrl, environment: runtimeEnvironment() };
+}
+
+const startupConfig = validateElectronConfig();
+
 // Service-role client  bypasses RLS, used only in main process for balance reads.
 // NOTE: Renderer uses bootstrap config (fetched via server.mjs /api/config), not these env vars.
 // These are ONLY for main-process IPC operations (auth, credit reads)  never sent to renderer.
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
-const supabaseAdmin = createSupabaseClient(
-  process.env.SUPABASE_URL              || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-  { auth: { persistSession: false, autoRefreshToken: false } }
-);
-
-// Startup: warn if service key is missing (blocks auth IPC handlers)
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("[STARTUP] SUPABASE_SERVICE_ROLE_KEY not set  auth features will fail");
-  // Show dialog after app is ready (can't call dialog before ready)
-  app.whenReady().then(() => {
-    dialog.showMessageBoxSync({
-      type:    "warning",
-      title:   "Missing Configuration",
-      message: "SUPABASE_SERVICE_ROLE_KEY is not set in .env.\nSome features (auth, balance sync) may not work correctly.",
-      buttons: ["OK"],
-    });
-  });
-}
+const supabaseAdmin = startupConfig.ok
+  ? createSupabaseClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    )
+  : null;
 
 //  Config 
 const PORT           = parseInt(process.env.EXPRESS_PORT || "3000", 10);
-const GCP_SERVER_URL = process.env.GCP_SERVER_URL || "http://localhost:4000";
-const isDev          = !app.isPackaged;
-// DEV BYPASS  remove before shipping
-const devBypass      = process.env.NODE_ENV === "development" || process.argv.includes("--dev");
+const GCP_SERVER_URL = startupConfig.gcpServerUrl;
+const isDev          = isDevelopment();
+const devBypass      = isDevelopment() && (process.env.LOQII_DEV_BYPASS === "1" || process.argv.includes("--dev"));
 app.setName("Loqii");
 
 //  State 
@@ -72,6 +95,49 @@ let isQuitting    = false;
 // Pending Google OAuth resolve function (set while waiting for deep link)
 let pendingOAuthResolve = null;
 let pendingOAuthReject  = null;
+
+// External navigation policy:
+// - Local app UI is owned by the embedded localhost server.
+// - OAuth may open Supabase/Google hosted URLs in the system browser.
+// - Payments may open Stripe Checkout in the system browser.
+// - tzurah:// and loqii:// are owned by this Electron app for legacy OAuth returns.
+const EXTERNAL_URL_ALLOWLIST = [
+  "https://tzurah.ai",
+  "https://www.tzurah.ai",
+  "https://admin.tzurah.ai",
+  "https://accounts.google.com",
+  "https://*.google.com",
+  "https://*.supabase.co",
+  "https://checkout.stripe.com",
+  "mailto:support@tzurah.ai",
+];
+
+function originMatches(pattern, target) {
+  if (pattern.startsWith("mailto:")) return target.href.startsWith(pattern);
+  const parsed = new URL(pattern.replace("*.", "placeholder."));
+  if (pattern.includes("*.")) {
+    const suffix = pattern.split("*.")[1];
+    return target.protocol === parsed.protocol && target.hostname.endsWith(`.${suffix}`);
+  }
+  return target.origin === parsed.origin;
+}
+
+function isAllowedExternalUrl(url) {
+  try {
+    const target = new URL(url);
+    return EXTERNAL_URL_ALLOWLIST.some((pattern) => originMatches(pattern, target));
+  } catch {
+    return false;
+  }
+}
+
+function safeOpenExternal(url) {
+  if (!isAllowedExternalUrl(url)) {
+    console.warn("[SECURITY] Blocked external URL");
+    return Promise.resolve(false);
+  }
+  return shell.openExternal(url);
+}
 
 function safeOAuthDescription(payload = {}) {
   if (payload.error_code === "user_banned") return "This account is banned.";
@@ -379,6 +445,7 @@ function ensureMainWin() {
       contextIsolation: true,
       nodeIntegration:  false,
       webSecurity:      true,
+      sandbox:          true,
     },
     show: false,
   });
@@ -393,8 +460,15 @@ function ensureMainWin() {
   mainWin.on("closed",    () => { mainWin = null; });
   mainWin.on("maximize",   () => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("window:maximized"); });
   mainWin.on("unmaximize", () => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("window:unmaximized"); });
+  mainWin.webContents.on("will-navigate", (event, url) => {
+    const allowedLocal = url.startsWith(`http://localhost:${PORT}`) || url.startsWith("file://");
+    if (!allowedLocal) {
+      event.preventDefault();
+      safeOpenExternal(url);
+    }
+  });
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    safeOpenExternal(url);
     return { action: "deny" };
   });
 }
@@ -523,7 +597,7 @@ function buildAppMenu() {
       { label: "Getting Started",   click: () => js("showOnboarding(true)") },
       { label: "Keyboard Shortcuts", accelerator: "Shift+/", click: () => js("showKeyboardShortcuts()") },
       { type: "separator" },
-      { label: "Contact Support", click: () => shell.openExternal("mailto:support@tzurah.ai") },
+      { label: "Contact Support", click: () => safeOpenExternal("mailto:support@tzurah.ai") },
       { label: "Check for Updates", click: () => getAutoUpdater()?.checkForUpdatesAndNotify() },
     ]},
   ];
@@ -727,7 +801,7 @@ ipcMain.handle("auth:google", async () => {
         pendingOAuthReject = null;
         reject(err);
       };
-      shell.openExternal(data.url).catch((err) => pendingOAuthReject(err));
+      safeOpenExternal(data.url).catch((err) => pendingOAuthReject(err));
 
       setTimeout(() => {
         if (!settled) {
@@ -996,7 +1070,7 @@ ipcMain.handle("stripe:checkout", async (_e, pack) => {
     });
     const data = await resp.json();
     if (!resp.ok) return { error: data.error || "Checkout failed" };
-    shell.openExternal(data.url);
+    await safeOpenExternal(data.url);
     return { ok: true };
   } catch (err) {
     return { error: err.message };
@@ -1056,7 +1130,7 @@ ipcMain.handle("app:relaunch", () => {
   app.exit(0);
 });
 
-ipcMain.handle("shell:openExternal", (_e, url) => shell.openExternal(url));
+ipcMain.handle("shell:openExternal", (_e, url) => safeOpenExternal(url));
 
 //  IPC: Recording 
 
@@ -1105,11 +1179,35 @@ function setupAutoUpdater() {
 
 //  App lifecycle 
 app.whenReady().then(async () => {
+  if (!startupConfig.ok) {
+    console.error("[STARTUP] Configuration unavailable:", startupConfig.missing.join(", "));
+    dialog.showMessageBoxSync({
+      type: "error",
+      title: "Configuration unavailable",
+      message: "Loqii cannot start because required configuration is unavailable.",
+      detail: isDevelopment() ? `Missing: ${startupConfig.missing.join(", ")}` : "Contact support if this persists.",
+      buttons: ["Exit"],
+    });
+    app.exit(1);
+    return;
+  }
+  console.log("[STARTUP] Loqii environment:", startupConfig.environment);
+  console.log("[STARTUP] Config valid:", startupConfig.ok ? "yes" : "no");
+  console.log("[STARTUP] Dev bypass:", devBypass ? "enabled" : "disabled");
   // Start local Express server (serves index.html + /api/token + sdk-bundle.js)
   try {
     await startExpress();
   } catch (err) {
-    console.error("Failed to start Express:", err);
+    console.error("[STARTUP] Local service failed:", err?.code || err?.message || err);
+    dialog.showMessageBoxSync({
+      type: "error",
+      title: "Service temporarily unavailable",
+      message: "Loqii cannot start because local services are unavailable.",
+      detail: isDevelopment() ? String(err?.message || err) : "Contact support if this persists.",
+      buttons: ["Exit"],
+    });
+    app.exit(1);
+    return;
   }
 
   // Give Express a moment to bind

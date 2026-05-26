@@ -314,10 +314,27 @@ Responsibility:
 - Proxy user-authenticated Decart token requests from Electron to the GCP server.
 - Preserve non-secret Decart routing metadata for diagnostics.
 - Never store or expose Decart API keys beyond the token response needed by the SDK.
+- Validate local proxy runtime config before production boot.
+- Fail closed when bootstrap config is unavailable in production.
 
 Debug checklist:
 - Normal users must continue to receive production Decart routing from GCP.
 - Dev/test routing decisions remain owned by `gcp-server.js`.
+- `BOOTSTRAP_SECRET`, `INTERNAL_SECRET`, and `GCP_SERVER_URL` are environment-owned; do not add literal fallback secrets.
+- Renderer code consumes `/api/config` and `/api/app-config`; it does not own production config truth.
+
+## Production Config Ownership
+
+Locations:
+- `electron.js`
+- `server.mjs`
+
+Rules:
+- Electron validates app runtime config before starting UI.
+- `server.mjs` validates bootstrap/internal secrets and fetched backend config before production listening.
+- Missing production config shows a safe user error and exits.
+- Detailed config diagnostics are logs-only and must not include secret values.
+- Development fallbacks must be explicit, local-only, and never used by packaged production.
 - Renderer may read `decart_environment_used` and `decart_reason`, but never receives raw production/dev keys separately.
 
 ## Update And Release Plumbing

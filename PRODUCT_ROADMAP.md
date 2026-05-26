@@ -74,6 +74,7 @@ Status: Phase 8D adds the admin-owned app flag control plane and Loqii resolved-
 
 - Code signing for Windows installer.
 - Release channel feed configured for beta and stable.
+- Production environment inventory verified for app and server required config.
 - Final billing reconciliation health check before public distribution.
 - Accessibility pass for modals, drawers, and keyboard focus loops.
 - Full update/rollback drill using GitHub Releases.
