@@ -304,10 +304,22 @@
     }
     .camera-select {
       flex: 1; min-width: 0; padding: 4px 8px;
-      background: var(--field); border: 1px solid var(--border);
-      border-radius: 5px; color: var(--text); font: inherit;
+      background: var(--surface-elevated); border: 1px solid var(--border);
+      border-radius: 5px; color: var(--text-primary); font: inherit;
       font-size: 0.75rem; outline: none; cursor: pointer;
       transition: border-color 0.2s;
+      color-scheme: dark;
+    }
+    body[data-theme="light"] .camera-select { color-scheme: light; }
+    .camera-select option,
+    select option {
+      background: var(--surface-elevated);
+      color: var(--text-primary);
+    }
+    select,
+    input,
+    textarea {
+      color: var(--text-primary);
     }
     .camera-select:hover { border-color: var(--border-strong); }
     .camera-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(63,108,81,.16); }
@@ -1923,6 +1935,7 @@ function setLoqiiTheme(theme) {
   document.body.dataset.theme = nextTheme;
   applyLoqiiThemeAliases();
   try { localStorage.setItem("loqii-theme", nextTheme); } catch {}
+  try { window.tzurah?.setPreference?.("loqii-theme", nextTheme); } catch {}
   themeButtons.forEach((btn) => {
     const isActive = btn.dataset.themeChoice === nextTheme;
     btn.classList.toggle("active", isActive);
@@ -2385,7 +2398,6 @@ function openHelpDrawer() {
 }
 
 function openAccountDrawer() {
-  const session = isElectron ? null : null;
   const body = `
     <section class="loqii-section">
       <div class="loqii-section-title">Account</div>
@@ -2395,7 +2407,7 @@ function openAccountDrawer() {
       <div class="loqii-section-title">Credits</div>
       <div class="loqii-section-copy">Current balance: <strong>${hdrCreditsVal?.textContent || "--"}</strong></div>
     </section>
-    <section class="loqii-section">
+    <section class="loqii-section loqii-drawer-actions">
       <button id="drawer-dashboard-btn" class="loqii-btn loqii-btn-primary" type="button">Open Dashboard</button>
       <button id="drawer-topup-btn" class="loqii-btn" type="button">Buy Credits</button>
     </section>`;

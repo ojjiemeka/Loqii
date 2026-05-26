@@ -17,7 +17,7 @@ function injectModalStyles() {
     .loqii-overlay {
       position: fixed; inset: 0; z-index: 9800;
       display: flex; align-items: center; justify-content: center;
-      padding: 20px; background: rgba(1,22,39,.72);
+      padding: 20px; background: var(--overlay, rgba(1,22,39,.72));
       backdrop-filter: blur(8px);
     }
     .loqii-modal {
@@ -26,28 +26,28 @@ function injectModalStyles() {
       display: flex; flex-direction: column; overflow: hidden;
       border: 1px solid var(--border);
       border-radius: 12px;
-      background: var(--surface);
-      color: var(--text);
+      background: var(--surface-elevated, var(--surface));
+      color: var(--text-primary, var(--text));
       box-shadow: 0 28px 80px var(--shadow);
     }
     .loqii-modal-header {
       flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
     }
-    .loqii-modal-title { font-size: .92rem; font-weight: 850; color: var(--text); }
+    .loqii-modal-title { font-size: .92rem; font-weight: 850; color: var(--text-primary, var(--text)); }
     .loqii-modal-close {
       width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
-      background: var(--surface2); color: var(--muted); cursor: pointer; font: inherit;
+      background: var(--surface-muted, var(--surface2)); color: var(--text-muted, var(--muted)); cursor: pointer; font: inherit;
     }
-    .loqii-modal-close:hover { color: var(--text); border-color: rgba(63,108,81,.45); }
+    .loqii-modal-close:hover { color: var(--text-primary, var(--text)); border-color: var(--accent-primary, var(--loqii-green)); }
     .loqii-modal-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 15px 16px; color: var(--muted); line-height: 1.55;
+      padding: 15px 16px; color: var(--text-secondary, var(--muted)); line-height: 1.55;
     }
-    .loqii-modal-body strong { color: var(--text); }
+    .loqii-modal-body strong { color: var(--text-primary, var(--text)); }
     .loqii-modal-input {
       width: 100%; margin-top: 10px; padding: 9px 10px; border-radius: 7px;
-      border: 1px solid var(--border); background: var(--field); color: var(--text);
+      border: 1px solid var(--border); background: var(--field, var(--surface-muted)); color: var(--text-primary, var(--text));
       font: inherit; outline: none;
     }
     .loqii-modal-footer {
@@ -56,25 +56,25 @@ function injectModalStyles() {
     }
     .loqii-btn {
       border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px;
-      background: var(--surface2); color: var(--text); cursor: pointer;
+      background: var(--surface-muted, var(--surface2)); color: var(--text-primary, var(--text)); cursor: pointer;
       font: inherit; font-size: .78rem; font-weight: 800;
     }
-    .loqii-btn:hover { border-color: rgba(63,108,81,.45); box-shadow: 0 0 14px rgba(63,108,81,.10); }
-    .loqii-btn-primary { background: var(--loqii-green); border-color: var(--loqii-green); color: var(--loqii-paper); }
-    .loqii-btn-danger { background: rgba(201,112,100,.14); border-color: rgba(201,112,100,.48); color: var(--loqii-coral); }
+    .loqii-btn:hover { border-color: var(--accent-primary, var(--loqii-green)); box-shadow: 0 0 14px rgba(63,108,81,.10); }
+    .loqii-btn-primary { background: var(--accent-primary, var(--loqii-green)); border-color: var(--accent-primary, var(--loqii-green)); color: var(--loqii-paper); }
+    .loqii-btn-danger { background: rgba(201,112,100,.14); border-color: var(--accent-danger, var(--loqii-coral)); color: var(--text-danger, var(--loqii-coral)); }
     .loqii-empty, .loqii-loading {
       border: 1px dashed var(--border); border-radius: 9px; padding: 18px;
-      text-align: center; color: var(--muted); background: var(--surface2);
+      text-align: center; color: var(--text-muted, var(--muted)); background: var(--surface-muted, var(--surface2));
     }
     .loqii-section {
-      border: 1px solid var(--border); border-radius: 9px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted, var(--surface2));
       padding: 11px; margin-bottom: 10px;
     }
     .loqii-section-title {
-      color: var(--text); font-size: .74rem; font-weight: 850; margin-bottom: 7px;
+      color: var(--text-primary, var(--text)); font-size: .74rem; font-weight: 850; margin-bottom: 7px;
       text-transform: uppercase; letter-spacing: .06em;
     }
-    .loqii-section-copy { color: var(--muted); font-size: .76rem; line-height: 1.5; }
+    .loqii-section-copy { color: var(--text-secondary, var(--muted)); font-size: .76rem; line-height: 1.5; }
     .loqii-loading::before {
       content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px;
       border: 2px solid rgba(247,243,227,.22); border-top-color: var(--loqii-green);

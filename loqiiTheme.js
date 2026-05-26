@@ -2,6 +2,7 @@ export const LOQII_THEME_TOKENS = Object.freeze({
   "--app-bg": "var(--bg)",
   "--surface-elevated": "var(--surface)",
   "--surface-muted": "var(--surface2)",
+  "--surface": "var(--surface)",
   "--text-primary": "var(--text)",
   "--text-secondary": "var(--muted)",
   "--text-muted": "var(--muted)",
