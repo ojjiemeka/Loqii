@@ -1809,7 +1809,20 @@ import { buildHelpMarkup } from "./loqiiHelp.js";
 
 // Reusable app modal alert component. Keep this isolated so dialog behavior
 // can be debugged independently from streaming/session code.
-function showAppModal({ title = "Notice", message = "", input = false, defaultValue = "", confirmLabel = "OK", cancelLabel = "Cancel", cancelable = true, variant = "default" } = {}) {
+function showAppModal({
+  title = "Notice",
+  message = "",
+  input = false,
+  defaultValue = "",
+  confirmLabel = "OK",
+  cancelLabel = "Cancel",
+  cancelable = true,
+  variant = "default",
+  persistent = false,
+  closeOnBackdrop,
+  closeOnEscape,
+  showCloseButton,
+} = {}) {
   const safeMessage = String(message == null ? "" : message)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return LoqiiModal({
@@ -1821,6 +1834,10 @@ function showAppModal({ title = "Notice", message = "", input = false, defaultVa
     cancelLabel,
     cancelable,
     danger: variant === "danger",
+    persistent,
+    closeOnBackdrop,
+    closeOnEscape,
+    showCloseButton,
   });
 }
 
@@ -5261,6 +5278,7 @@ async function renderOnboardingStep() {
   const step = ONBOARDING_STEPS[onboardingStep];
   const isLast = onboardingStep === ONBOARDING_STEPS.length - 1;
   const isFirst = onboardingStep === 0;
+  const onboardingRequired = isFeatureEnabled("onboarding_required", false);
   const dots = ONBOARDING_STEPS.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === onboardingStep ? "var(--accent)" : "var(--border)"}"></div>`).join("");
   const result = await LoqiiModal({
     title: step.title,
@@ -5269,14 +5287,18 @@ async function renderOnboardingStep() {
       <div class="loqii-section-copy" style="text-transform:uppercase;letter-spacing:.08em;color:var(--text-success);font-weight:800;margin-bottom:8px">${step.subtitle}</div>
       <p class="loqii-section-copy">${step.description}</p>`,
     confirmLabel: step.action,
-    cancelLabel: isFirst ? "Skip tutorial" : "Back",
-    cancelable: !isLast,
+    cancelLabel: onboardingRequired ? "Skip tutorial" : (isFirst ? "Skip tutorial" : "Back"),
+    cancelable: onboardingRequired || !isLast,
+    persistent: onboardingRequired,
+    closeOnBackdrop: !onboardingRequired,
+    closeOnEscape: !onboardingRequired,
+    showCloseButton: !onboardingRequired && !isLast,
     width: 460,
   });
   if (result) {
     if (isLast) completeOnboarding();
     else { onboardingStep++; renderOnboardingStep(); }
-  } else if (isFirst) {
+  } else if (onboardingRequired || isFirst) {
     completeOnboarding();
   } else {
     onboardingStep = Math.max(0, onboardingStep - 1);

@@ -17,3 +17,4 @@ Short, high-signal lessons only. Add durable rules, not session notes.
 - Tests are part of the change, not afterthoughts.
 - Feature flags are release gates.
 - Settings is stable config; Dev is experiment control.
+- Persistent modals must declare every close path.

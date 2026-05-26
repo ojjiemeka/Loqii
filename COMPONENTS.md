@@ -244,6 +244,8 @@ Debug checklist:
 - Confirm drawers have bounded height and internal scroll.
 - Confirm Escape closes cancelable drawers/modals.
 - Confirm dark mode text uses semantic tokens rather than hardcoded black text.
+- Confirm modal overlay roots receive `theme-light`/`theme-dark` plus Loqii theme classes so header, body, and footer inherit one token set.
+- Required onboarding must pass `persistent`, `closeOnBackdrop: false`, and `closeOnEscape: false`; dismissal must come only from explicit Skip/Get Started actions.
 - If feature flag fetch fails, experimental features should default off while core login/start/stop remains usable.
 
 ### App Feature Flag Consumption
@@ -264,6 +266,7 @@ Permanent user/dev mode rules:
 - No fake, static, or placeholder metrics are shown as live product data.
 - No raw debug text, Decart routing metadata, prompt layers, retry timers, or feature flag snapshots appear outside a Developer section.
 - All modals use `LoqiiModal` or `LoqiiConfirm`; all drawers use `LoqiiDrawer`.
+- Modal persistence uses shared `LoqiiModal` options: `persistent`, `closeOnBackdrop`, `closeOnEscape`, and `showCloseButton`.
 - All new text and surfaces use semantic theme tokens, not hardcoded black/white styling.
 - Light and dark mode must be manually checked for every new modal, drawer, alert, and settings section.
 - Account remains a single drawer surface; do not add a second account window or nested account modal.

@@ -22,19 +22,61 @@ function injectModalStyles() {
       padding: 20px; background: var(--overlay);
       backdrop-filter: blur(8px);
     }
+    .loqii-overlay.loqii-theme-light,
+    .loqii-overlay.theme-light {
+      --bg: var(--loqii-paper);
+      --surface: var(--loqii-paper);
+      --surface2: rgba(96,109,93,.08);
+      --surface3: rgba(96,109,93,.13);
+      --surface-elevated: var(--loqii-paper);
+      --surface-muted: var(--surface2);
+      --text: var(--loqii-ink);
+      --muted: var(--loqii-muted);
+      --text-primary: var(--loqii-ink);
+      --text-secondary: var(--loqii-muted);
+      --text-muted: var(--loqii-muted);
+      --accent-primary: var(--loqii-green);
+      --accent-danger: var(--loqii-coral);
+      --border: rgba(96,109,93,.26);
+      --overlay: rgba(1,22,39,.68);
+      --shadow: rgba(1,22,39,.10);
+      --accent-glow: rgba(63,108,81,.18);
+    }
+    .loqii-overlay.loqii-theme-dark,
+    .loqii-overlay.theme-dark {
+      --bg: var(--loqii-ink);
+      --surface: rgba(1,22,39,.96);
+      --surface2: rgba(247,243,227,.055);
+      --surface3: rgba(96,109,93,.16);
+      --surface-elevated: rgba(1,22,39,.96);
+      --surface-muted: var(--surface2);
+      --text: var(--loqii-paper);
+      --muted: rgba(247,243,227,.66);
+      --text-primary: var(--loqii-paper);
+      --text-secondary: rgba(247,243,227,.76);
+      --text-muted: rgba(247,243,227,.66);
+      --accent-primary: var(--loqii-green);
+      --accent-danger: var(--loqii-coral);
+      --border: rgba(96,109,93,.32);
+      --overlay: rgba(1,22,39,.7);
+      --shadow: rgba(1,22,39,.45);
+      --accent-glow: rgba(63,108,81,.22);
+    }
     .loqii-modal {
       width: min(520px, 100%);
       max-height: min(82vh, 680px);
       display: flex; flex-direction: column; overflow: hidden;
       border: 1px solid var(--border);
       border-radius: 12px;
-      background: var(--surface-elevated);
+      background: var(--surface);
       color: var(--text-primary);
       box-shadow: 0 28px 80px var(--shadow);
     }
     .loqii-modal-header {
       flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-primary);
     }
     .loqii-modal-title { font-size: .92rem; font-weight: 850; color: var(--text-primary); }
     .loqii-modal-close {
@@ -44,8 +86,9 @@ function injectModalStyles() {
     .loqii-modal-close:hover { color: var(--text-primary); border-color: var(--accent-primary); }
     .loqii-modal-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 15px 16px; color: var(--text-secondary); line-height: 1.55;
+      padding: 15px 16px; background: var(--surface); color: var(--text-secondary); line-height: 1.55;
     }
+    .loqii-modal-body p { color: var(--text-secondary); }
     .loqii-modal-body strong { color: var(--text-primary); }
     .loqii-modal-input {
       width: 100%; margin-top: 10px; padding: 9px 10px; border-radius: 7px;
@@ -55,6 +98,7 @@ function injectModalStyles() {
     .loqii-modal-footer {
       flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 8px;
       padding: 12px 16px; border-top: 1px solid var(--border);
+      background: var(--surface);
     }
     .loqii-btn {
       border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px;
@@ -65,6 +109,7 @@ function injectModalStyles() {
     .loqii-btn:hover { border-color: var(--accent-primary); box-shadow: 0 0 14px var(--accent-glow); }
     .loqii-btn-primary { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--loqii-paper); }
     .loqii-btn-danger { background: var(--surface); border-color: var(--accent-danger); color: var(--accent-danger); }
+    .loqii-btn-primary.loqii-btn-danger { background: var(--accent-danger); border-color: var(--accent-danger); color: var(--loqii-paper); }
     .loqii-btn-secondary { background: var(--surface); color: var(--text-secondary); }
     .loqii-empty, .loqii-loading {
       border: 1px dashed var(--border); border-radius: 9px; padding: 18px;
@@ -173,7 +218,14 @@ export function LoqiiModal(options = {}) {
     width = 520,
     showFooter = true,
     className = "",
+    persistent = false,
+    closeOnBackdrop,
+    closeOnEscape,
+    showCloseButton,
   } = options;
+  const allowBackdropClose = closeOnBackdrop ?? (!persistent && cancelable);
+  const allowEscapeClose = closeOnEscape ?? (!persistent && cancelable);
+  const renderCloseButton = showCloseButton ?? (cancelable && !persistent);
 
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
@@ -185,7 +237,7 @@ export function LoqiiModal(options = {}) {
       <section class="loqii-modal ${escapeHtml(className)}" style="width:min(${Number(width) || 520}px,100%)">
         <header class="loqii-modal-header">
           <div class="loqii-modal-title">${escapeHtml(title)}</div>
-          ${cancelable ? `<button class="loqii-modal-close" type="button" data-loqii-cancel aria-label="Close">x</button>` : ""}
+          ${renderCloseButton ? `<button class="loqii-modal-close" type="button" data-loqii-cancel aria-label="Close">x</button>` : ""}
         </header>
         <div class="loqii-modal-body">
           ${typeof body === "string" ? body : ""}
@@ -205,11 +257,11 @@ export function LoqiiModal(options = {}) {
     };
     const onKey = (event) => {
       if (!document.body.contains(overlay)) return document.removeEventListener("keydown", onKey);
-      if (event.key === "Escape" && cancelable) finish(false);
+      if (event.key === "Escape" && allowEscapeClose) finish(false);
       if (event.key === "Enter" && showFooter && !event.shiftKey && event.target?.tagName !== "TEXTAREA") finish(true);
     };
     document.addEventListener("keydown", onKey);
-    overlay.addEventListener("click", (event) => { if (event.target === overlay && cancelable) finish(false); });
+    overlay.addEventListener("click", (event) => { if (event.target === overlay && allowBackdropClose) finish(false); });
     overlay.querySelectorAll("[data-loqii-cancel]").forEach((btn) => btn.addEventListener("click", () => finish(false)));
     overlay.querySelector("[data-loqii-confirm]")?.addEventListener("click", () => finish(true));
     setTimeout(() => overlay.querySelector("[data-loqii-input]")?.focus(), 40);
@@ -221,6 +273,6 @@ export function LoqiiConfirm(message, options = {}) {
     ...options,
     body: `<p>${escapeHtml(message)}</p>`,
     confirmLabel: options.confirmLabel || "Confirm",
-    cancelable: true,
+    cancelable: options.cancelable ?? true,
   });
 }

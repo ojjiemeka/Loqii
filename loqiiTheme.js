@@ -32,8 +32,8 @@ export function applyThemeToOverlayRoot(root, source = document.body) {
   if (!root) return root;
   const theme = source?.dataset?.theme === "light" ? "light" : "dark";
   root.dataset.theme = theme;
-  root.classList.remove("loqii-theme-light", "loqii-theme-dark");
-  root.classList.add(`loqii-theme-${theme}`);
+  root.classList.remove("loqii-theme-light", "loqii-theme-dark", "theme-light", "theme-dark");
+  root.classList.add(`loqii-theme-${theme}`, `theme-${theme}`);
   return root;
 }
 
