@@ -361,18 +361,34 @@
     <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
   </svg>Continue with Google`;
 
+  function resetGoogleButton() {
+    btnGoogle.disabled = false;
+    btnGoogle.innerHTML = GOOGLE_SVG;
+  }
+
+  function oauthErrorMessage(result = {}) {
+    if (result.error_code === "user_banned") return "This account is banned.";
+    return result.error_description || result.error || "Google sign-in failed. Please try again.";
+  }
+
+  function showOAuthError(result = {}) {
+    resetGoogleButton();
+    showMsg(oauthErrorMessage(result), "error");
+  }
+
+  r.on?.("oauth-result", (result) => {
+    if (result?.ok === false) showOAuthError(result);
+  });
+
   btnGoogle.addEventListener("click", async () => {
     if (btnGoogle.disabled) return;
     clearMsg();
     setBusy(btnGoogle, true, "Opening Google…");
     const result = await r.googleAuth();
     if (result.cancelled) {
-      btnGoogle.disabled  = false;
-      btnGoogle.innerHTML = GOOGLE_SVG;
+      resetGoogleButton();
     } else if (result.error) {
-      showMsg(result.error, "error");
-      btnGoogle.disabled  = false;
-      btnGoogle.innerHTML = GOOGLE_SVG;
+      showOAuthError(result);
     }
     // On success, electron.js calls showMainApp() — window transitions automatically
   });

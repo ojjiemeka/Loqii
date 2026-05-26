@@ -75,6 +75,77 @@ let isQuitting    = false;
 let pendingOAuthResolve = null;
 let pendingOAuthReject  = null;
 
+function safeOAuthDescription(payload = {}) {
+  if (payload.error_code === "user_banned") return "This account is banned.";
+  return payload.error_description || payload.error || "Google sign-in failed. Please try again.";
+}
+
+function rendererOAuthPayload(payload = {}) {
+  const ok = !(payload.error || payload.error_code);
+  return {
+    ok,
+    error: payload.error || null,
+    error_code: payload.error_code || null,
+    error_description: ok ? null : safeOAuthDescription(payload),
+  };
+}
+
+function sendOAuthResultToAuthWindow(payload = {}) {
+  const safePayload = rendererOAuthPayload(payload);
+  BrowserWindow.getAllWindows().forEach((w) => {
+    if (!w.isDestroyed()) w.webContents.send("oauth-result", safePayload);
+  });
+  if (mainWin && !mainWin.isDestroyed()) {
+    if (mainWin.isMinimized()) mainWin.restore();
+    mainWin.focus();
+  }
+}
+
+function settlePendingOAuth(payload = {}) {
+  if (payload.error || payload.error_code) {
+    sendOAuthResultToAuthWindow(payload);
+    if (pendingOAuthReject) {
+      const err = new Error(safeOAuthDescription(payload));
+      err.error_code = payload.error_code || payload.error || "oauth_error";
+      err.error_description = safeOAuthDescription(payload);
+      pendingOAuthReject(err);
+    }
+    return;
+  }
+
+  if (payload.access_token || payload.code) {
+    if (pendingOAuthResolve) {
+      pendingOAuthResolve({
+        access_token: payload.access_token || "",
+        refresh_token: payload.refresh_token || "",
+        code: payload.code || "",
+      });
+    }
+  }
+}
+
+function oauthPayloadFromParams(params) {
+  return {
+    error: params.get("error") || null,
+    error_code: params.get("error_code") || null,
+    error_description: params.get("error_description") || null,
+    access_token: params.get("access_token") || null,
+    refresh_token: params.get("refresh_token") || null,
+    code: params.get("code") || null,
+  };
+}
+
+function mergeOAuthPayloads(...payloads) {
+  return payloads.reduce((merged, payload) => ({
+    error: merged.error || payload.error || null,
+    error_code: merged.error_code || payload.error_code || null,
+    error_description: merged.error_description || payload.error_description || null,
+    access_token: merged.access_token || payload.access_token || null,
+    refresh_token: merged.refresh_token || payload.refresh_token || null,
+    code: merged.code || payload.code || null,
+  }), {});
+}
+
 function getAutoUpdater() {
   if (isDev) return null;
   if (!autoUpdater) {
@@ -123,16 +194,12 @@ function handleDeepLink(rawUrl) {
   // tzurah://auth/callback#access_token=...&refresh_token=...
   // Supabase OAuth redirects with tokens in the hash fragment.
   if (parsed.hostname === "auth" && parsed.pathname.includes("callback")) {
-    const hash   = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
-    const params = new URLSearchParams(hash);
-    const accessToken  = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-
-    if (accessToken && pendingOAuthResolve) {
-      pendingOAuthResolve({ access_token: accessToken, refresh_token: refreshToken || "" });
-      pendingOAuthResolve = null;
-      pendingOAuthReject  = null;
-    }
+    const queryParams = new URLSearchParams(parsed.search.startsWith("?") ? parsed.search.slice(1) : parsed.search);
+    const hashParams  = new URLSearchParams(parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash);
+    settlePendingOAuth(mergeOAuthPayloads(
+      oauthPayloadFromParams(queryParams),
+      oauthPayloadFromParams(hashParams)
+    ));
     return;
   }
 
@@ -473,6 +540,12 @@ function buildAppMenu() {
 //  Local Express server 
 async function startExpress() {
   serverModule = await import("./server.mjs");
+  if (serverModule?.setOAuthCallbackHandler) {
+    serverModule.setOAuthCallbackHandler((payload) => {
+      console.log("[OAUTH] Local callback received:", payload?.error_code || payload?.error || payload?.code ? "result" : "empty");
+      settlePendingOAuth(payload || {});
+    });
+  }
   expressServer = await serverModule.startServer(PORT);
 }
 
@@ -677,12 +750,15 @@ ipcMain.handle("auth:google", async () => {
       }, 300_000);
     });
 
-    // Exchange tokens with Supabase
-    const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
-      access_token:  tokens.access_token,
-      refresh_token: tokens.refresh_token,
-    });
+    // Exchange OAuth result with Supabase. Tokens never leave the main process.
+    const { data: sessionData, error: sessionErr } = tokens.code
+      ? await supabase.auth.exchangeCodeForSession(tokens.code)
+      : await supabase.auth.setSession({
+          access_token:  tokens.access_token,
+          refresh_token: tokens.refresh_token,
+        });
     if (sessionErr) return { error: sessionErr.message };
+    if (!sessionData?.session) return { error: "Google sign-in did not return a session." };
 
     const user = sessionData.session.user;
 
@@ -708,10 +784,15 @@ ipcMain.handle("auth:google", async () => {
     ensureProfileForUser(sessionData.session.access_token).catch(() => {});
 
     showMainApp();
+    sendOAuthResultToAuthWindow({ ok: true });
     return { ok: true, user: db.getSession() };
   } catch (err) {
     if (err.message === "cancelled") return { cancelled: true };
-    return { error: err.message };
+    return {
+      error: err.error_description || err.message,
+      error_code: err.error_code || null,
+      error_description: err.error_description || err.message,
+    };
   }
 });
 

@@ -142,7 +142,7 @@ contextBridge.exposeInMainWorld("tzurah", {
    *   "app:update-ready" → cb()
    */
   on: (channel, cb) => {
-    const allowed = ["credits:updated", "payment:success", "app:update-ready", "window:maximized", "window:unmaximized"];
+    const allowed = ["credits:updated", "payment:success", "app:update-ready", "window:maximized", "window:unmaximized", "oauth-result"];
     if (!allowed.includes(channel)) return () => {};
     const handler = (_event, ...args) => cb(...args);
     ipcRenderer.on(channel, handler);

@@ -31,6 +31,135 @@ const __dirname  = path.dirname(__filename);
 const GCP_URL      = process.env.GCP_SERVER_URL || "http://34.39.83.195:4000";
 const APP_SECRET   = process.env.BOOTSTRAP_SECRET || "tzurah-bootstrap-2025-prod";
 let appConfig      = null; // in-memory only
+let oauthCallbackHandler = null;
+
+export function setOAuthCallbackHandler(handler) {
+  oauthCallbackHandler = typeof handler === "function" ? handler : null;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function oauthMessageFor(payload = {}) {
+  if (payload.error_code === "user_banned") return "This account is banned.";
+  return payload.error_description || payload.error || "Authentication failed.";
+}
+
+function hasOAuthPayload(payload = {}) {
+  return Boolean(
+    payload.error ||
+    payload.error_code ||
+    payload.error_description ||
+    payload.access_token ||
+    payload.refresh_token ||
+    payload.code
+  );
+}
+
+function sanitizeOAuthPayload(payload = {}) {
+  return {
+    error: payload.error || null,
+    error_code: payload.error_code || null,
+    error_description: payload.error_description || null,
+    access_token: payload.access_token || null,
+    refresh_token: payload.refresh_token || null,
+    code: payload.code || null,
+  };
+}
+
+function dispatchOAuthCallback(payload) {
+  if (!oauthCallbackHandler) {
+    console.warn("[OAUTH] Callback received before Electron handler was registered");
+    return;
+  }
+  try {
+    oauthCallbackHandler(sanitizeOAuthPayload(payload));
+  } catch (err) {
+    console.warn("[OAUTH] Callback handler failed:", err?.message || err);
+  }
+}
+
+function oauthCallbackPage(payload = {}) {
+  const failed = Boolean(payload.error || payload.error_code);
+  const message = failed
+    ? `Authentication failed: ${oauthMessageFor(payload)}`
+    : "Authentication received. You can return to Loqii.";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loqii Authentication</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #011627;
+      color: #F7F3E3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(480px, calc(100vw - 32px));
+      border: 1px solid rgba(247, 243, 227, 0.16);
+      border-radius: 16px;
+      padding: 28px;
+      background: rgba(1, 22, 39, 0.92);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      text-align: center;
+    }
+    h1 { margin: 0 0 10px; font-size: 1.25rem; }
+    p { margin: 0; color: rgba(247, 243, 227, 0.78); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>${failed ? "Authentication failed" : "Authentication received"}</h1>
+    <p id="message">${escapeHtml(message)}</p>
+  </main>
+  <script>
+    (async () => {
+      const params = new URLSearchParams(window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash);
+      const payload = Object.fromEntries(params.entries());
+      if (payload.error || payload.error_code || payload.error_description || payload.access_token || payload.refresh_token || payload.code) {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        try {
+          await fetch("/oauth/callback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const banned = payload.error_code === "user_banned";
+          document.getElementById("message").textContent = banned
+            ? "Authentication failed: This account is banned."
+            : payload.error
+              ? "Authentication failed. You can return to Loqii."
+              : "Authentication received. You can return to Loqii.";
+        } catch {
+          document.getElementById("message").textContent = "Authentication received. Return to Loqii to continue.";
+        }
+      }
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+function handleOAuthBrowserCallback(req, res) {
+  const payload = sanitizeOAuthPayload(req.method === "POST" ? req.body : req.query);
+  if (hasOAuthPayload(payload)) dispatchOAuthCallback(payload);
+  res
+    .status(payload.error || payload.error_code ? 400 : 200)
+    .setHeader("Cache-Control", "no-store")
+    .send(oauthCallbackPage(payload));
+}
 
 async function fetchBootstrap() {
   try {
@@ -108,7 +237,13 @@ function buildApp() {
   // ── HTML pages ────────────────────────────────────────────────
 
   // Main face-swap app (requires login — index.html checks session via IPC)
-  app.get("/",               (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+  app.get("/", (req, res) => {
+    if (hasOAuthPayload(req.query)) return handleOAuthBrowserCallback(req, res);
+    return res.sendFile(path.join(__dirname, "index.html"));
+  });
+  app.get("/auth/callback", handleOAuthBrowserCallback);
+  app.get("/oauth/callback", handleOAuthBrowserCallback);
+  app.post("/oauth/callback", handleOAuthBrowserCallback);
   app.get("/obs",            (_req, res) => res.sendFile(path.join(__dirname, "obs.html")));
 
   // Auth screens (also loadFile'd by Electron, but served here for completeness)
