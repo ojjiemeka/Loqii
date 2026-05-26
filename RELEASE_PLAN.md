@@ -2,6 +2,19 @@
 
 This plan defines the update architecture before packaging or shipping a production installer.
 
+## Coding Engine Release Gate
+
+Before any non-trivial release-affecting change, Codex must read:
+- `AGENT.md`
+- `BRAIN.md`
+- `COMPONENTS.md`
+- `PRODUCT_ROADMAP.md`
+- `RELEASE_PLAN.md`
+
+Release work must declare repo scope (`Loqii only`, `Tzurah-AI only`, or `both repos required`), risk class, blast radius, rollback path, and test gate before sync.
+
+Never use `git add -A`. Always use the approved sync script for the touched repo.
+
 ## Repository And Sync Boundaries
 
 Current structure:
@@ -39,6 +52,8 @@ Do not mix these paths. The server/admin deploy repository must not become the a
 Approved app source sync files:
 - `README.app.md` copied as `README.md`
 - `app-repo.gitignore` copied as `.gitignore`
+- `AGENT.md`
+- `BRAIN.md`
 - `git-update-app.sh`
 - `index.html`
 - `electron.js`

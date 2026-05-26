@@ -1,5 +1,11 @@
 # Loqii Product Roadmap
 
+## Coding Engine Requirement
+
+Every non-trivial Loqii change starts by reading `AGENT.md`, `BRAIN.md`, `COMPONENTS.md`, `PRODUCT_ROADMAP.md`, and `RELEASE_PLAN.md`.
+
+The product roadmap must not become a scratchpad. Add only durable product, release, diagnostics, or safety decisions that affect future work.
+
 ## Completed Systems
 
 - Split repositories: Loqii app source is separate from Tzurah-AI server/admin deploy.
@@ -25,6 +31,13 @@
 - Live metrics must be honest: no static CR/S, no estimated usage presented as real usage, and no debug counters outside Developer.
 - Account remains one drawer with Add Credits, Sync Credits, Sign Out, and purchase history.
 - Alerts and shared modals inherit the active theme and use semantic alert/theme tokens.
+
+## Coding Engine Roadmap
+
+- Keep `AGENT.md`, `BRAIN.md`, `COMPONENTS.md`, `PRODUCT_ROADMAP.md`, and `RELEASE_PLAN.md` current as the app architecture changes.
+- Add lightweight CI checks for native dialog usage, mojibake, debug leakage, and sync whitelist drift.
+- Add a release checklist item that verifies every feature/debug panel is flag-gated and hidden by default.
+- Keep repo-boundary documentation in both Loqii and Tzurah-AI so app and server work cannot drift into each other accidentally.
 
 ## Settings Maturity Roadmap
 

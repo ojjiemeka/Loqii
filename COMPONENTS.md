@@ -2,6 +2,56 @@
 
 Permanent debugging rule: treat every change as a small Lego module. Find the component boundary first, change the smallest isolated surface, then test that surface before moving outward.
 
+## Loqii/Tzurah Coding Engine
+
+Codex must read `AGENT.md`, `BRAIN.md`, `COMPONENTS.md`, `PRODUCT_ROADMAP.md`, and `RELEASE_PLAN.md` before non-trivial edits.
+
+Before code, declare:
+- Repo scope: `Loqii only`, `Tzurah-AI only`, or `both repos required`.
+- Risk class: `trivial`, `low risk`, `medium risk`, `high risk`, or `dangerous`.
+- Topology: affected files, state ownership, data flow, async/timing risks, UI surfaces, API/database boundaries, and blast radius.
+
+Four invariants:
+- Where does state live?
+- Where does feedback or observability live?
+- What breaks if this changes?
+- When does timing or order matter?
+
+Stop before coding if repo boundary, state ownership, API contract, database migration, billing impact, auth/session flow, or user intent is unclear.
+
+Permanent agent entry rule: before non-trivial edits, read `AGENT.md`, `BRAIN.md`, `COMPONENTS.md`, `PRODUCT_ROADMAP.md`, and `RELEASE_PLAN.md`.
+
+## Loqii/Tzurah Coding Engine
+
+Topology-first checklist:
+- Identify affected files.
+- Identify state ownership.
+- Identify data flow.
+- Identify async/timing risks.
+- Identify UI surfaces affected.
+- Identify backend/API/database boundaries.
+- Identify blast radius.
+
+Four invariants:
+- Where does state live?
+- Where does feedback or observability live?
+- What breaks if this changes?
+- When does timing or order matter?
+
+Repo boundary gate:
+- `Loqii only`: app UI/UX, Electron, OAuth shell, Decart client/session UX, scenes/styles/prompts, local components.
+- `Tzurah-AI only`: backend/admin, billing, protected billing, reconciliation, Decart token routing, feature flags, database/API contracts.
+- `Both repos required`: explain the contract reason before editing either side.
+
+Risk classes:
+- `trivial`: typo/copy-only, no behavior.
+- `low risk`: isolated UI/docs helper with clear owner.
+- `medium risk`: shared component, async UI, IPC, feature flags, auth-adjacent.
+- `high risk`: session lifecycle, OAuth, Decart routing assumptions, billing-adjacent, release/sync scripts.
+- `dangerous`: billing/protected billing/reconciliation/database migration/secrets.
+
+High-risk and dangerous work requires topology notes, rollback plan, explicit tests, and no broad refactor.
+
 ## Electron App UI
 
 Location: `index.html`
