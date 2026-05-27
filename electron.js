@@ -29,6 +29,9 @@ let autoUpdater       = null;
 const db       = require("./db.js");
 const supabase = require("./supabase.js");
 
+// Reduce non-fatal Chromium/WebRTC DNS noise without suppressing app console logs.
+app.commandLine.appendSwitch("log-level", "2");
+
 function runtimeEnvironment() {
   const raw = String(process.env.LOQII_ENV || process.env.TZURAH_ENV || process.env.NODE_ENV || (app.isPackaged ? "production" : "development")).toLowerCase();
   return ["production", "staging", "development"].includes(raw) ? raw : "development";

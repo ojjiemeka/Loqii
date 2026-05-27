@@ -44,10 +44,16 @@ function envValue(name, { required = false, devDefault = null } = {}) {
   return "";
 }
 
+const developmentGeneratedSecretNames = new Set();
+
 function ensureDevelopmentSecret(name, devValue, generated) {
-  if (process.env[name] && String(process.env[name]).trim()) return;
+  if (process.env[name] && String(process.env[name]).trim()) {
+    if (developmentGeneratedSecretNames.has(name)) generated.push(name);
+    return;
+  }
   if (!isDevelopment()) return;
   process.env[name] = devValue;
+  developmentGeneratedSecretNames.add(name);
   generated.push(name);
 }
 
@@ -80,6 +86,7 @@ function validateLocalServerConfig() {
     gcpServerUrl,
     bootstrapSecret: envValue("BOOTSTRAP_SECRET", { required: true }),
     internalSecret: envValue("INTERNAL_SECRET", { required: true }),
+    generatedSecrets: new Set(generated),
   };
 }
 
@@ -106,6 +113,9 @@ const INTERNAL_SECRET = localServerConfig.internalSecret;
 let appConfig      = null; // in-memory only
 let configDegraded = false;
 let configDegradedReason = "";
+let bootstrapSource = "pending";
+let lastBootstrapFailure = null;
+let startupHealthLogged = false;
 let oauthCallbackHandler = null;
 
 const SAFE_DEV_FEATURE_FLAGS = Object.freeze({
@@ -134,6 +144,7 @@ const SAFE_DEV_FEATURE_FLAGS = Object.freeze({
 function markConfigDegraded(reason) {
   configDegraded = true;
   configDegradedReason = reason || "backend bootstrap unavailable";
+  bootstrapSource = isDevelopment() ? "local_dev_defaults" : "failed";
 }
 
 function isConfigDegraded() {
@@ -141,6 +152,7 @@ function isConfigDegraded() {
 }
 
 function safeDevBootstrapConfig(reason) {
+  bootstrapSource = "local_dev_defaults";
   return {
     ok: false,
     degraded: true,
@@ -155,6 +167,17 @@ function safeDevBootstrapConfig(reason) {
     free_credits_on_signup: 6,
     app_version: "dev",
   };
+}
+
+function logStartupHealthSummary() {
+  if (startupHealthLogged) return;
+  startupHealthLogged = true;
+  console.log("[STARTUP] Loqii environment:", runtimeEnvironment());
+  console.log("[STARTUP] Backend bootstrap:", bootstrapSource);
+  console.log("[STARTUP] App config:", appConfig ? "available" : "unavailable");
+  console.log("[STARTUP] Auth:", appConfig?.supabase_url && appConfig?.supabase_anon_key ? "available" : (isDevelopment() ? "local login page available" : "unavailable"));
+  console.log("[STARTUP] Decart token: requires login");
+  console.log("[STARTUP] Billing: server-owned");
 }
 
 async function safeErrorFromResponse(res) {
@@ -306,6 +329,7 @@ async function fetchBootstrap() {
     });
     if (!res.ok) {
       const safe = await safeErrorFromResponse(res);
+      lastBootstrapFailure = { status: res.status, code: safe.code, reason: safe.reason };
       console.error(`[BOOTSTRAP] Failed endpoint=${endpoint} status=${res.status} code=${safe.code} reason=${safe.reason}`);
       return false;
     }
@@ -313,6 +337,8 @@ async function fetchBootstrap() {
     validateBootstrapPayload(appConfig);
     configDegraded = false;
     configDegradedReason = "";
+    bootstrapSource = "remote";
+    lastBootstrapFailure = null;
     console.log("[BOOTSTRAP] Environment:", runtimeEnvironment());
     console.log("[BOOTSTRAP] Config loaded successfully");
     console.log("[BOOTSTRAP] Supabase URL:", appConfig.supabase_url ? "configured" : "missing");
@@ -322,6 +348,7 @@ async function fetchBootstrap() {
     return true;
   } catch (err) {
     const code = err?.name === "TimeoutError" ? "BOOTSTRAP_TIMEOUT" : (err?.code || "BOOTSTRAP_NETWORK_OR_PARSE_ERROR");
+    lastBootstrapFailure = { status: null, code, reason: err?.message || "request failed" };
     console.error(`[BOOTSTRAP] Failed endpoint=${endpoint} status=none code=${code} reason=${err?.message || "request failed"}`);
     return false;
   }
@@ -331,7 +358,17 @@ let _bootstrapTimerStarted = false;
 let _bootstrapRefreshTimer = null;
 
 async function bootstrapWithRetry(maxAttempts = 5) {
-  for (let i = 0; i < maxAttempts; i++) {
+  if (isDevelopment() && localServerConfig.generatedSecrets?.has("BOOTSTRAP_SECRET")) {
+    const reason = "development bootstrap secret not configured";
+    markConfigDegraded(reason);
+    appConfig = safeDevBootstrapConfig(reason);
+    console.warn("[BOOTSTRAP] Development bootstrap secret not configured; using local safe defaults");
+    logStartupHealthSummary();
+    return false;
+  }
+
+  const attempts = isDevelopment() ? 1 : maxAttempts;
+  for (let i = 0; i < attempts; i++) {
     if (await fetchBootstrap()) {
       // Start 30-minute refresh timer only once, anchored to first success
       if (!_bootstrapTimerStarted) {
@@ -341,19 +378,28 @@ async function bootstrapWithRetry(maxAttempts = 5) {
           fetchBootstrap().catch(() => {});
         }, 30 * 60 * 1000);
       }
+      logStartupHealthSummary();
       return true;
     }
-    if (i < maxAttempts - 1) {
-      console.log(`[BOOTSTRAP] Retry ${i + 1}/${maxAttempts - 1} in 3s...`);
+    if (i < attempts - 1) {
+      console.log(`[BOOTSTRAP] Retry ${i + 1}/${attempts - 1} in 3s...`);
       await new Promise(r => setTimeout(r, 3000));
     }
   }
-  const reason = `backend bootstrap unavailable after ${maxAttempts} attempts`;
+  const rejectedSecret = lastBootstrapFailure?.status === 401 || lastBootstrapFailure?.status === 403;
+  const reason = rejectedSecret ? "backend rejected bootstrap secret" : `backend bootstrap unavailable after ${attempts} attempt${attempts === 1 ? "" : "s"}`;
   markConfigDegraded(reason);
-  console.error("[BOOTSTRAP] Could not reach backend after", maxAttempts, "attempts");
   if (isDevelopment()) {
     appConfig = safeDevBootstrapConfig(reason);
-    console.warn("[BOOTSTRAP] Development degraded mode: using local safe defaults");
+    if (rejectedSecret) {
+      console.warn("[BOOTSTRAP] Backend rejected bootstrap secret. Set matching BOOTSTRAP_SECRET in Loqii and Tzurah env. Using dev safe defaults.");
+    } else {
+      console.warn("[BOOTSTRAP] Development degraded mode: using local safe defaults");
+    }
+    logStartupHealthSummary();
+  } else {
+    console.error("[BOOTSTRAP] Could not reach backend after", attempts, "attempts");
+    logStartupHealthSummary();
   }
   return false;
 }
@@ -501,6 +547,10 @@ function buildApp() {
     if (!appConfig) return res.status(503).json({ error: "Configuration unavailable" });
     return res.json({
       ok: !isConfigDegraded(),
+      source: bootstrapSource,
+      bootstrap_source: bootstrapSource,
+      bootstrap_degraded: isConfigDegraded(),
+      bootstrap_reason: isDevelopment() ? configDegradedReason : undefined,
       degraded: isConfigDegraded(),
       degraded_reason: isDevelopment() ? configDegradedReason : undefined,
       supabase_url:           appConfig.supabase_url,
@@ -532,11 +582,22 @@ function buildApp() {
         signal: AbortSignal.timeout(5000),
       });
       if (!gcpRes.ok) throw new Error(`GCP app config failed: ${gcpRes.status}`);
-      return res.json(await gcpRes.json());
+      const data = await gcpRes.json();
+      return res.json({
+        ...data,
+        source: bootstrapSource,
+        bootstrap_source: bootstrapSource,
+        bootstrap_degraded: isConfigDegraded(),
+        bootstrap_reason: isDevelopment() ? configDegradedReason : undefined,
+      });
     } catch (err) {
       console.warn("[APP CONFIG] Falling back to safe flags:", err.message);
       return res.json({
         ok: false,
+        source: bootstrapSource,
+        bootstrap_source: bootstrapSource,
+        bootstrap_degraded: isConfigDegraded(),
+        bootstrap_reason: isDevelopment() ? (configDegradedReason || "backend app config unavailable") : undefined,
         degraded: isConfigDegraded(),
         degraded_reason: isDevelopment() ? (configDegradedReason || "backend app config unavailable") : undefined,
         feature_flags: appConfig.feature_flags || { ...SAFE_DEV_FEATURE_FLAGS },
@@ -622,7 +683,7 @@ function attachObsWebSocket(httpServer) {
 // startServer - called by electron.js
 export async function startServer(port) {
   localServerConfig = validateLocalServerConfig();
-  if (isProduction()) {
+  if (!isDevelopment()) {
     const ok = await bootstrapWithRetry(3);
     if (!ok) {
       const error = new Error("Configuration unavailable");
@@ -651,7 +712,7 @@ export async function startServer(port) {
   attachObsWebSocket(server);
 
   // Bootstrap in background - renderer retries /api/config until ready
-  if (!isProduction()) bootstrapWithRetry(5).catch(() => {});
+  if (isDevelopment()) bootstrapWithRetry(5).catch(() => {});
 
   return server;
 }
