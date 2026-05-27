@@ -168,8 +168,10 @@ Future option:
 ## Preconditions Before Shipping `.exe`
 
 - App login, credits, Decart token, and start/stop lifecycle verified.
-- Packaged app refuses to boot without production `GCP_SERVER_URL`, `BOOTSTRAP_SECRET`, `INTERNAL_SECRET`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
-- Local proxy bootstrap validates backend config before production listening.
+- Packaged app refuses to boot without production `GCP_SERVER_URL`, `INTERNAL_SECRET`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`; `BOOTSTRAP_SECRET` is required whenever privileged bootstrap is enabled for the release.
+- Public pre-login config is served by `/api/public-config` and verified to expose only Supabase URL, anon key, app metadata, public flags, and auth provider availability.
+- Privileged local proxy bootstrap validates backend config before production listening when required.
+- Reopen while logged in restores the Supabase session; explicit Sign Out clears the cached session and returns to login on next launch.
 - Google OAuth verified through system-browser deep link without duplicate Electron windows, or disabled by app feature flag.
 - Help, onboarding, diagnostics, scene/style engines, light mode, mock payments, and developer tools verified behind admin-controlled app flags.
 - Billing reconciliation dashboard healthy or degraded only with understood resolved historical events.

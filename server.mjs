@@ -169,6 +169,29 @@ function safeDevBootstrapConfig(reason) {
   };
 }
 
+function publicConfigToAppConfig(payload = {}) {
+  const flags = payload.public_flags && typeof payload.public_flags === "object"
+    ? payload.public_flags
+    : {};
+  return {
+    ok: true,
+    degraded: false,
+    degraded_reason: "",
+    supabase_url: payload.supabase_url || "",
+    supabase_anon_key: payload.supabase_anon_key || "",
+    gcp_server_url: GCP_URL,
+    feature_flags: { ...SAFE_DEV_FEATURE_FLAGS, ...flags },
+    app_flags: { ...SAFE_DEV_FEATURE_FLAGS, ...flags },
+    credit_packs: [],
+    burn_rate: 2.18,
+    free_credits_on_signup: 6,
+    app_version: payload.app_version || "dev",
+    app_name: payload.app_name || "Loqii",
+    auth_providers: payload.auth_providers || { email: true, google: flags.enable_google_oauth === true },
+    environment_label: payload.environment_label || runtimeEnvironment(),
+  };
+}
+
 function logStartupHealthSummary() {
   if (startupHealthLogged) return;
   startupHealthLogged = true;
@@ -188,6 +211,40 @@ async function safeErrorFromResponse(res) {
     return { code: String(code).slice(0, 80), reason: String(reason).slice(0, 160) };
   } catch {
     return { code: `HTTP_${res.status}`, reason: res.statusText || "request rejected" };
+  }
+}
+
+async function fetchPublicConfig() {
+  const endpoint = "/api/public-config";
+  try {
+    const res = await fetch(`${GCP_URL}${endpoint}`, {
+      headers: { "Cache-Control": "no-store" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      const safe = await safeErrorFromResponse(res);
+      lastBootstrapFailure = { status: res.status, code: safe.code, reason: safe.reason };
+      console.warn(`[PUBLIC CONFIG] Failed endpoint=${endpoint} status=${res.status} code=${safe.code} reason=${safe.reason}`);
+      return false;
+    }
+    const payload = await res.json();
+    if (!payload?.success || !payload?.supabase_url || !payload?.supabase_anon_key) {
+      lastBootstrapFailure = { status: null, code: "PUBLIC_CONFIG_INVALID", reason: "missing public config fields" };
+      console.warn("[PUBLIC CONFIG] Failed endpoint=/api/public-config status=none code=PUBLIC_CONFIG_INVALID reason=missing public config fields");
+      return false;
+    }
+    appConfig = publicConfigToAppConfig(payload);
+    configDegraded = false;
+    configDegradedReason = "";
+    bootstrapSource = "public_config";
+    lastBootstrapFailure = null;
+    console.log("[PUBLIC CONFIG] Config loaded successfully");
+    return true;
+  } catch (err) {
+    const code = err?.name === "TimeoutError" ? "PUBLIC_CONFIG_TIMEOUT" : (err?.code || "PUBLIC_CONFIG_NETWORK_OR_PARSE_ERROR");
+    lastBootstrapFailure = { status: null, code, reason: err?.message || "request failed" };
+    console.warn(`[PUBLIC CONFIG] Failed endpoint=${endpoint} status=none code=${code} reason=${err?.message || "request failed"}`);
+    return false;
   }
 }
 
@@ -359,10 +416,14 @@ let _bootstrapRefreshTimer = null;
 
 async function bootstrapWithRetry(maxAttempts = 5) {
   if (isDevelopment() && localServerConfig.generatedSecrets?.has("BOOTSTRAP_SECRET")) {
-    const reason = "development bootstrap secret not configured";
+    if (await fetchPublicConfig()) {
+      logStartupHealthSummary();
+      return true;
+    }
+    const reason = "BOOTSTRAP_SECRET not configured";
     markConfigDegraded(reason);
     appConfig = safeDevBootstrapConfig(reason);
-    console.warn("[BOOTSTRAP] Development bootstrap secret not configured; using local safe defaults");
+    console.warn("[BOOTSTRAP] Dev privileged bootstrap skipped: BOOTSTRAP_SECRET not configured");
     logStartupHealthSummary();
     return false;
   }
@@ -390,12 +451,16 @@ async function bootstrapWithRetry(maxAttempts = 5) {
   const reason = rejectedSecret ? "backend rejected bootstrap secret" : `backend bootstrap unavailable after ${attempts} attempt${attempts === 1 ? "" : "s"}`;
   markConfigDegraded(reason);
   if (isDevelopment()) {
-    appConfig = safeDevBootstrapConfig(reason);
     if (rejectedSecret) {
-      console.warn("[BOOTSTRAP] Backend rejected bootstrap secret. Set matching BOOTSTRAP_SECRET in Loqii and Tzurah env. Using dev safe defaults.");
+      console.warn("[BOOTSTRAP] Dev bootstrap secret rejected. Check Loqii BOOTSTRAP_SECRET matches Tzurah BOOTSTRAP_SECRET. Continuing with safe dev defaults.");
+      if (await fetchPublicConfig()) {
+        logStartupHealthSummary();
+        return false;
+      }
     } else {
       console.warn("[BOOTSTRAP] Development degraded mode: using local safe defaults");
     }
+    appConfig = safeDevBootstrapConfig(reason);
     logStartupHealthSummary();
   } else {
     console.error("[BOOTSTRAP] Could not reach backend after", attempts, "attempts");
@@ -538,15 +603,19 @@ function buildApp() {
   });
 
   // /api/config - expose bootstrap config to renderer
-  app.get("/api/config", (_req, res) => {
+  app.get("/api/config", async (_req, res) => {
     if (!appConfig && isDevelopment()) {
-      const reason = configDegradedReason || "backend bootstrap unavailable";
+      await fetchPublicConfig();
+    }
+    if (!appConfig && isDevelopment()) {
+      const reason = configDegradedReason || "backend public config unavailable";
       markConfigDegraded(reason);
       appConfig = safeDevBootstrapConfig(reason);
     }
     if (!appConfig) return res.status(503).json({ error: "Configuration unavailable" });
     return res.json({
       ok: !isConfigDegraded(),
+      config_source: bootstrapSource,
       source: bootstrapSource,
       bootstrap_source: bootstrapSource,
       bootstrap_degraded: isConfigDegraded(),
@@ -562,11 +631,17 @@ function buildApp() {
       burn_rate:              appConfig.burn_rate,
       free_credits_on_signup: appConfig.free_credits_on_signup,
       app_version:            appConfig.app_version,
+      app_name:               appConfig.app_name,
+      auth_providers:         appConfig.auth_providers,
+      environment_label:      appConfig.environment_label,
     });
   });
 
   // /mock/purchase - proxy to GCP (localhost-only, Electron test mode)
   app.get("/api/app-config", async (req, res) => {
+    if (!appConfig && isDevelopment()) {
+      await fetchPublicConfig();
+    }
     if (!appConfig && isDevelopment()) {
       const reason = configDegradedReason || "backend app config unavailable";
       markConfigDegraded(reason);

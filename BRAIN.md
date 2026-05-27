@@ -20,3 +20,4 @@ Short, high-signal lessons only. Add durable rules, not session notes.
 - Persistent modals must declare every close path.
 - Production config fails closed before UI boot.
 - Dev degraded mode may unblock login, never backend-owned truth.
+- Public config may identify the app; privileged bootstrap may trust the app.

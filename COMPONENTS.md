@@ -315,8 +315,10 @@ Responsibility:
 - Preserve non-secret Decart routing metadata for diagnostics.
 - Never store or expose Decart API keys beyond the token response needed by the SDK.
 - Validate local proxy runtime config before production boot.
-- Fail closed when bootstrap config is unavailable in production.
-- In development, backend bootstrap failure enters degraded mode with safe local feature defaults instead of blocking login.
+- Fetch public pre-login config from backend `/api/public-config` without privileged secrets.
+- Use privileged `/api/bootstrap` with `x-app-secret` only for server-owned startup config that requires trust.
+- Fail closed when privileged bootstrap is required and unavailable in production/staging.
+- In development, missing or rejected `BOOTSTRAP_SECRET` does not retry-spam; the app uses public config when available, then safe local defaults only as a last resort.
 
 Debug checklist:
 - Normal users must continue to receive production Decart routing from GCP.
@@ -324,6 +326,22 @@ Debug checklist:
 - `BOOTSTRAP_SECRET`, `INTERNAL_SECRET`, and `GCP_SERVER_URL` are environment-owned; do not add literal fallback secrets.
 - Renderer code consumes `/api/config` and `/api/app-config`; it does not own production config truth.
 - Degraded development config must never fake Decart tokens, billing, session ping, or credit sync endpoints.
+
+## Auth Session Ownership
+
+Locations:
+- `electron.js`
+- `db.js`
+- `preload.js`
+- `index.html`
+
+Rules:
+- Supabase session persistence is owned by Electron main process plus the SQLite cache in `db.js`.
+- Renderer pages never own raw access or refresh tokens; they request fresh access tokens through preload IPC only when calling user-authenticated APIs.
+- Startup restore is owned by `electron.js:restoreSupabaseSession()` and `showRestoredSessionOrLogin()`.
+- Login-vs-main-app routing is owned by Electron window factories in `electron.js`.
+- Explicit sign out is owned by `auth:logout`; it calls Supabase sign-out, clears SQLite session cache, rebuilds the login surface, and refreshes tray state.
+- Feature flags refresh after restore from renderer `/api/app-config`; balance refresh after restore is triggered from Electron main process.
 
 ## Production Config Ownership
 

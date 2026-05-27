@@ -549,6 +549,21 @@ function openDashboard() {
   runMainAppSurface("loqiiOpenAccount");
 }
 
+async function showRestoredSessionOrLogin() {
+  const local = db.getSession();
+  if (local && local.access_token) {
+    const session = await restoreSupabaseSession();
+    if (session) {
+      showMainApp();
+      setTimeout(() => refreshCreditsFromServer().catch(() => {}), 2000);
+      return true;
+    }
+    db.clearSession();
+  }
+  showLoginScreen();
+  return false;
+}
+
 //  System tray 
 function createTray() {
   const iconPath = path.join(__dirname, "assets", "tray-icon.png");
@@ -1235,30 +1250,7 @@ app.whenReady().then(async () => {
   createTray();
   buildAppMenu();
   setupAutoUpdater();
-
-  // DEV MODE  show login screen so real accounts can be tested.
-  // The "Dev Bypass" button in login.html calls window.tzurah.devBypass()
-  // which seeds a local session and skips straight to the main app.
-  if (devBypass) {
-    showLoginScreen();
-    return;
-  }
-
-  // Attempt to restore a previous session
-  const local = db.getSession();
-  if (local && local.access_token) {
-    const session = await restoreSupabaseSession();
-    if (session) {
-      showMainApp();
-      // Refresh credits in background after launch
-      setTimeout(() => refreshCreditsFromServer().catch(() => {}), 2000);
-      return;
-    }
-    // Tokens expired and couldn't refresh  clear and show login
-    db.clearSession();
-  }
-
-  showLoginScreen();
+  await showRestoredSessionOrLogin();
 });
 
 app.on("window-all-closed", () => {
@@ -1271,8 +1263,7 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   // macOS: re-create window if dock icon clicked and no windows are open
   if (BrowserWindow.getAllWindows().length === 0) {
-    const local = db.getSession();
-    if (local) showMainApp(); else showLoginScreen();
+    showRestoredSessionOrLogin().catch(() => showLoginScreen());
   }
 });
 
