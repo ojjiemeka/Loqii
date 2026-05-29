@@ -45,3 +45,9 @@ This app repo must not contain:
 - production server/admin deploy files
 
 Use `git-update-app.sh` from the working source folder to sync approved app files only.
+
+## Runtime Config And Decart Tokens
+
+- Normal development startup uses `/api/public-config`; privileged `/api/bootstrap` is skipped unless `LOQII_USE_PRIVILEGED_BOOTSTRAP=true`.
+- `/api/app-config` is fetched after auth for user-resolved flags and dev/test account behavior.
+- Decart realtime sessions request authenticated short-lived client tokens from the backend. Permanent Decart API keys must stay server-side and must never be returned to the renderer or committed to this repo.

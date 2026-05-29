@@ -2,10 +2,10 @@
  * server.mjs - Local Express server  (ES Module)
  *
  * Runs embedded inside Electron on port 3000 (default).
- * Serves static assets + the Decart API token proxy.
+ * Serves static assets + the Decart client-token proxy.
  *
  * Auth and payments are handled by the GCP server (gcp-server.js).
- * The Decart API key is NEVER stored locally - always fetched from GCP.
+ * Permanent Decart API keys are NEVER stored locally or returned to the renderer.
  *
  * Routes:
  *   GET  /                -> index.html  (main face-swap app)
@@ -14,7 +14,7 @@
  *   GET  /signup.html     -> signup.html
  *   GET  /topup.html      -> topup.html
  *   GET  /dashboard.html  -> dashboard.html
- *   GET  /api/token       -> Decart API key proxied from GCP (cached 5 min)
+ *   GET  /api/token       -> authenticated Decart client-token compatibility route
  *   GET  /api/key         -> alias of /api/token (standalone compat)
  */
 
@@ -88,6 +88,17 @@ function validateLocalServerConfig() {
     internalSecret: envValue("INTERNAL_SECRET", { required: true }),
     generatedSecrets: new Set(generated),
   };
+}
+
+function usePrivilegedBootstrap() {
+  if (isDevelopment()) {
+    return String(process.env.LOQII_USE_PRIVILEGED_BOOTSTRAP || "").toLowerCase() === "true";
+  }
+  return true;
+}
+
+function privilegedBootstrapRequired() {
+  return usePrivilegedBootstrap() && !isDevelopment();
 }
 
 function validateBootstrapPayload(payload) {
@@ -195,12 +206,11 @@ function publicConfigToAppConfig(payload = {}) {
 function logStartupHealthSummary() {
   if (startupHealthLogged) return;
   startupHealthLogged = true;
-  console.log("[STARTUP] Loqii environment:", runtimeEnvironment());
-  console.log("[STARTUP] Backend bootstrap:", bootstrapSource);
-  console.log("[STARTUP] App config:", appConfig ? "available" : "unavailable");
-  console.log("[STARTUP] Auth:", appConfig?.supabase_url && appConfig?.supabase_anon_key ? "available" : (isDevelopment() ? "local login page available" : "unavailable"));
-  console.log("[STARTUP] Decart token: requires login");
-  console.log("[STARTUP] Billing: server-owned");
+  console.log("[CONFIG] source:", bootstrapSource);
+  console.log("[BOOTSTRAP] privileged bootstrap", usePrivilegedBootstrap() ? "enabled" : "skipped");
+  console.log("[AUTH] Supabase public auth config", appConfig?.supabase_url && appConfig?.supabase_anon_key ? "available" : "unavailable");
+  console.log("[DECART] client token requires authenticated user");
+  console.log("[BILLING] server-owned");
 }
 
 async function safeErrorFromResponse(res) {
@@ -238,7 +248,7 @@ async function fetchPublicConfig() {
     configDegradedReason = "";
     bootstrapSource = "public_config";
     lastBootstrapFailure = null;
-    console.log("[PUBLIC CONFIG] Config loaded successfully");
+    console.log("[CONFIG] public_config loaded");
     return true;
   } catch (err) {
     const code = err?.name === "TimeoutError" ? "PUBLIC_CONFIG_TIMEOUT" : (err?.code || "PUBLIC_CONFIG_NETWORK_OR_PARSE_ERROR");
@@ -394,7 +404,7 @@ async function fetchBootstrap() {
     validateBootstrapPayload(appConfig);
     configDegraded = false;
     configDegradedReason = "";
-    bootstrapSource = "remote";
+    bootstrapSource = "privileged_bootstrap";
     lastBootstrapFailure = null;
     console.log("[BOOTSTRAP] Environment:", runtimeEnvironment());
     console.log("[BOOTSTRAP] Config loaded successfully");
@@ -415,6 +425,20 @@ let _bootstrapTimerStarted = false;
 let _bootstrapRefreshTimer = null;
 
 async function bootstrapWithRetry(maxAttempts = 5) {
+  if (isDevelopment() && !usePrivilegedBootstrap()) {
+    if (await fetchPublicConfig()) {
+      console.log("[BOOTSTRAP] Privileged bootstrap skipped in dev; using public config.");
+      logStartupHealthSummary();
+      return true;
+    }
+    const reason = "public config unavailable";
+    markConfigDegraded(reason);
+    appConfig = safeDevBootstrapConfig(reason);
+    console.warn("[BOOTSTRAP] Privileged bootstrap skipped in dev; using local dev fallback.");
+    logStartupHealthSummary();
+    return false;
+  }
+
   if (isDevelopment() && localServerConfig.generatedSecrets?.has("BOOTSTRAP_SECRET")) {
     if (await fetchPublicConfig()) {
       logStartupHealthSummary();
@@ -469,23 +493,6 @@ async function bootstrapWithRetry(maxAttempts = 5) {
   return false;
 }
 
-// Token cache (avoids hitting GCP on every renderer request)
-let _cachedRawDecartKey   = null;
-let _rawDecartKeyCachedAt = 0;
-const TOKEN_CACHE_MS = 5 * 60 * 1000; // 5 minutes
-
-async function fetchTokenFromGCP() {
-  const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
-  const gcpRes = await fetch(`${gcpUrl}/internal/decart-key`, {
-    headers: { "x-internal-secret": INTERNAL_SECRET },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!gcpRes.ok) throw new Error(`GCP token fetch failed: ${gcpRes.status}`);
-  const data = await gcpRes.json();
-  if (!data.token) throw new Error("GCP returned no token");
-  return data.token;
-}
-
 // Build Express app
 function buildApp() {
   const app = express();
@@ -514,36 +521,58 @@ function buildApp() {
   app.get("/topup.html",     (_req, res) => res.sendFile(path.join(__dirname, "topup.html")));
   app.get("/dashboard.html", (_req, res) => res.sendFile(path.join(__dirname, "dashboard.html")));
 
-  // /api/token + /api/key - proxy Decart key from GCP
-  // Key is NEVER stored locally. Fetched from GCP and cached for 5 min.
-  // Falls back to stale cache if GCP is unreachable.
-  async function handleTokenRequest(_req, res) {
+  // /api/token + /api/key - compatibility wrappers for authenticated Decart client tokens.
+  // Permanent Decart keys never enter this local proxy or the renderer.
+  async function handleTokenRequest(req, res) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     try {
-      const bust = parseInt(process.env.TOKEN_CACHE_BUSTED || "0");
-      if (_cachedRawDecartKey && Date.now() - _rawDecartKeyCachedAt < TOKEN_CACHE_MS && _rawDecartKeyCachedAt > bust) {
-        return res.json({ apiKey: _cachedRawDecartKey });
+      const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
+      const gcpRes = await fetch(`${gcpUrl}/decart/token`, {
+        headers: {
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await gcpRes.json().catch(() => ({}));
+      if (!gcpRes.ok) {
+        return res.status(gcpRes.status).json(data);
       }
-      const token = await fetchTokenFromGCP();
-      _cachedRawDecartKey   = token;
-      _rawDecartKeyCachedAt = Date.now();
-      console.log("[TOKEN] Fresh key fetched from GCP and cached");
-      return res.json({ apiKey: _cachedRawDecartKey });
+      const token = data.apiKey || data.token || data.api_key || data.key || null;
+      if (!token) {
+        return res.status(503).json({ error: "No client token in backend response" });
+      }
+      console.log("[DECART] client token received env=" + (data.decart_environment_used || data.environment || "unknown") + " expiresAt=" + (data.expiresAt || "unknown"));
+      return res.json({
+        apiKey: token,
+        token,
+        expiresAt: data.expiresAt || null,
+        decart_environment_used: data.decart_environment_used || data.environment || null,
+        decart_reason: data.decart_reason || data.reason || null,
+        decart_test_user: data.decart_test_user === true,
+        allowedModels: data.allowedModels || null,
+        constraints: data.constraints || null,
+      });
     } catch (err) {
-      console.error("[TOKEN] Proxy error:", err.message);
-      if (_cachedRawDecartKey) {
-        console.warn("[TOKEN] Returning stale cached key as fallback");
-        return res.json({ apiKey: _cachedRawDecartKey });
-      }
-      return res.status(503).json({ error: "Could not fetch API token from GCP" });
+      console.error("[DECART] client token fetch failed:", err.code || err.message);
+      return res.status(503).json({ error: "Service temporarily unavailable" });
     }
   }
 
   app.get("/api/token", handleTokenRequest);
   app.get("/api/key",   handleTokenRequest);
 
-  // /decart/token - proxies user-authed request to GCP
+  // /decart/token - proxies user-authed client-token request to GCP
   // Requires Authorization: Bearer <supabase-access-token> from the renderer.
-  // GCP validates the JWT and returns the Decart API token.
+  // GCP validates the JWT and returns a short-lived Decart client token.
   // TODO: cache is keyed on a single slot - fine for single-user Electron,
   //       but a multi-user server deployment would need per-user caching.
   app.get("/decart/token", async (req, res) => {
@@ -572,15 +601,11 @@ function buildApp() {
       }
 
       const data = await gcpRes.json();
-      console.log("[TOKEN] GCP response fields:", Object.keys(data));
-      if (data.decart_environment_used || data.decart_reason) {
-        console.log("[TOKEN] Decart environment:", data.decart_environment_used || "unknown", data.decart_reason || "");
-      }
 
       const token = data.token || data.apiKey || data.api_key ||
                     data.key || data.data?.token || data.access_token || null;
 
-      console.log("[TOKEN] Extracted token:", token ? "present" : "missing");
+      console.log("[DECART] client token received env=" + (data.decart_environment_used || data.environment || "unknown") + " expiresAt=" + (data.expiresAt || "unknown"));
 
       if (!token) {
         console.error("[TOKEN] Could not find token in GCP response:", Object.keys(data));
@@ -591,13 +616,17 @@ function buildApp() {
 
       return res.json({
         token,
+        apiKey: token,
+        expiresAt: data.expiresAt || null,
         decart_environment_used: data.decart_environment_used || data.environment || null,
         decart_reason: data.decart_reason || data.reason || null,
         decart_test_user: data.decart_test_user === true,
+        allowedModels: data.allowedModels || null,
+        constraints: data.constraints || null,
       });
 
     } catch (err) {
-      console.error("[DECART TOKEN] Fetch failed:", err.code || err.message);
+      console.error("[DECART] client token fetch failed:", err.code || err.message);
       return res.status(503).json({ error: "Service temporarily unavailable" });
     }
   });
@@ -616,10 +645,13 @@ function buildApp() {
     return res.json({
       ok: !isConfigDegraded(),
       config_source: bootstrapSource,
+      privileged_bootstrap_used: bootstrapSource === "privileged_bootstrap",
+      privileged_bootstrap_required: privilegedBootstrapRequired(),
       source: bootstrapSource,
       bootstrap_source: bootstrapSource,
       bootstrap_degraded: isConfigDegraded(),
       bootstrap_reason: isDevelopment() ? configDegradedReason : undefined,
+      reason: isDevelopment() ? configDegradedReason : undefined,
       degraded: isConfigDegraded(),
       degraded_reason: isDevelopment() ? configDegradedReason : undefined,
       supabase_url:           appConfig.supabase_url,
@@ -660,19 +692,27 @@ function buildApp() {
       const data = await gcpRes.json();
       return res.json({
         ...data,
+        config_source: data.config_source || "app_config",
+        privileged_bootstrap_used: bootstrapSource === "privileged_bootstrap",
+        privileged_bootstrap_required: privilegedBootstrapRequired(),
         source: bootstrapSource,
         bootstrap_source: bootstrapSource,
         bootstrap_degraded: isConfigDegraded(),
         bootstrap_reason: isDevelopment() ? configDegradedReason : undefined,
+        reason: isDevelopment() ? configDegradedReason : undefined,
       });
     } catch (err) {
       console.warn("[APP CONFIG] Falling back to safe flags:", err.message);
       return res.json({
         ok: false,
+        config_source: bootstrapSource,
+        privileged_bootstrap_used: bootstrapSource === "privileged_bootstrap",
+        privileged_bootstrap_required: privilegedBootstrapRequired(),
         source: bootstrapSource,
         bootstrap_source: bootstrapSource,
         bootstrap_degraded: isConfigDegraded(),
         bootstrap_reason: isDevelopment() ? (configDegradedReason || "backend app config unavailable") : undefined,
+        reason: isDevelopment() ? (configDegradedReason || "backend app config unavailable") : undefined,
         degraded: isConfigDegraded(),
         degraded_reason: isDevelopment() ? (configDegradedReason || "backend app config unavailable") : undefined,
         feature_flags: appConfig.feature_flags || { ...SAFE_DEV_FEATURE_FLAGS },
@@ -777,7 +817,7 @@ export async function startServer(port) {
       console.log(`  http://localhost:${port}`);
       console.log("-----------------------------------------------");
       console.log("  GET /api/config -> bootstrap config for renderer");
-      console.log("  GET /api/token  -> Decart key (proxied from backend)");
+      console.log("  GET /api/token  -> Decart client token (proxied from backend)");
       console.log("  GET /           -> index.html");
       console.log("  WS  /           -> OBS frame relay");
       console.log("===============================================\n");

@@ -1228,7 +1228,7 @@ app.whenReady().then(async () => {
   console.log("[STARTUP] Loqii environment:", startupConfig.environment);
   console.log("[STARTUP] Config valid:", startupConfig.ok ? "yes" : "no");
   console.log("[STARTUP] Dev bypass:", devBypass ? "enabled" : "disabled");
-  // Start local Express server (serves index.html + /api/token + sdk-bundle.js)
+  // Start local Express server (serves index.html + authenticated Decart client-token proxy)
   try {
     await startExpress();
   } catch (err) {

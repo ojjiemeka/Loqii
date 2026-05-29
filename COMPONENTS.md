@@ -317,12 +317,15 @@ Responsibility:
 - Validate local proxy runtime config before production boot.
 - Fetch public pre-login config from backend `/api/public-config` without privileged secrets.
 - Use privileged `/api/bootstrap` with `x-app-secret` only for server-owned startup config that requires trust.
+- Normal development startup skips privileged bootstrap unless `LOQII_USE_PRIVILEGED_BOOTSTRAP=true`.
 - Fail closed when privileged bootstrap is required and unavailable in production/staging.
 - In development, missing or rejected `BOOTSTRAP_SECRET` does not retry-spam; the app uses public config when available, then safe local defaults only as a last resort.
 
 Debug checklist:
 - Normal users must continue to receive production Decart routing from GCP.
 - Dev/test routing decisions remain owned by `gcp-server.js`.
+- Decart realtime uses authenticated short-lived client tokens from `/decart/token` or `/api/decart/client-token`.
+- Permanent Decart `dct_...` keys must never be returned by Loqii routes or logged.
 - `BOOTSTRAP_SECRET`, `INTERNAL_SECRET`, and `GCP_SERVER_URL` are environment-owned; do not add literal fallback secrets.
 - Renderer code consumes `/api/config` and `/api/app-config`; it does not own production config truth.
 - Degraded development config must never fake Decart tokens, billing, session ping, or credit sync endpoints.

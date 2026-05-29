@@ -21,3 +21,4 @@ Short, high-signal lessons only. Add durable rules, not session notes.
 - Production config fails closed before UI boot.
 - Dev degraded mode may unblock login, never backend-owned truth.
 - Public config may identify the app; privileged bootstrap may trust the app.
+- Normal dev boot should not test privileged trust unless explicitly asked.
