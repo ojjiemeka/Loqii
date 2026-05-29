@@ -953,6 +953,17 @@ ipcMain.handle("credits:getBalance", async () => {
 });
 
 ipcMain.handle("credits:deduct", async (_e, credits, seconds, metadata = null) => {
+  const billingMetadata = metadata && typeof metadata === "object" ? metadata : {};
+  if (!billingMetadata.session_id) {
+    const current = db.getSession();
+    console.warn("[DEDUCT BLOCKED] missing authoritative session", {
+      session_id: null,
+      sync_id: billingMetadata.sync_id || null,
+      source: billingMetadata.source || null,
+    });
+    return { remaining: current?.credits_remaining ?? 0, blocked: true, reason: "missing_authoritative_session" };
+  }
+
   // Deduct locally first for instant UI feedback
   const localBalance = db.deductCredits(credits);
   db.logUsage(seconds, credits);
@@ -972,7 +983,6 @@ ipcMain.handle("credits:deduct", async (_e, credits, seconds, metadata = null) =
     console.log("[DEDUCT] Syncing to server  credits:", credits, "seconds:", seconds, "token:", accessToken ? "present" : "missing");
 
     const local = db.getSession();
-    const billingMetadata = metadata && typeof metadata === "object" ? metadata : {};
     const body = {
       credits,
       session_seconds: seconds,
@@ -1029,11 +1039,19 @@ ipcMain.handle("credits:sync", async (_e, metadata = null) => {
 
   const local = db.getSession();
   if (!local) return { ok: false };
+  const billingMetadata = metadata && typeof metadata === "object" ? metadata : {};
+  if (!billingMetadata.session_id) {
+    console.warn("[DEDUCT BLOCKED] missing authoritative session", {
+      session_id: null,
+      sync_id: billingMetadata.sync_id || null,
+      source: billingMetadata.source || "credits_sync",
+    });
+    return { ok: false, blocked: true, reason: "missing_authoritative_session" };
+  }
 
   try {
     const accessToken = await getFreshAccessToken();
     if (!accessToken) return { ok: false };
-    const billingMetadata = metadata && typeof metadata === "object" ? metadata : {};
     const resp = await fetch(`${GCP_SERVER_URL}/credits/sync`, {
       method:  "POST",
       headers: {

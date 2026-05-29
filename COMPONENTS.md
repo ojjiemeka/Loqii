@@ -157,6 +157,9 @@ Debug checklist:
 - Verify `session_id`, `sync_id`, `sync_sequence`, `source`, and `client_ts`.
 - Check `sessions.is_active`, `kill_signal`, `last_ping`, and `last_sync_at`.
 - Confirm legacy deduction remains authoritative until live RPC switch is approved.
+- Register the authoritative backend session through `/session/ping` before enabling the local deduction timer.
+- Deduct/sync must fail closed locally when the authoritative `session_id` is missing or still initializing.
+- Reconnect may preserve the authoritative `session_id`; it must not clear or recreate billing state without an explicit stop/finalize path.
 - Never select `profiles.email`.
 - Keep numeric guards: finite, non-negative, capped.
 

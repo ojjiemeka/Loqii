@@ -2306,6 +2306,8 @@ let _creditSyncInProgress = false;
 let _finalSyncInProgress  = false;
 let billingSyncSequence  = 0;
 let hasFinalSyncedSession = false;
+let authoritativeSessionReady = false;
+let authoritativeSessionRegistering = false;
 // credits (Electron)
 let localCredits         = 0;
 let sessionSecondsTotal  = 0;
@@ -2315,22 +2317,30 @@ let lastSyncedSeconds    = 0;
 //  Session ping (GCP live session tracking) 
 async function startSessionPing() {
   console.log("[PING] startSessionPing called, isElectron:", isElectron);
-  if (!isElectron) return;
+  if (!isElectron) return false;
+  if (sessionPingInterval) return true;
   const session = await window.tzurah.getSession().catch((e) => {
     console.error("[PING] getSession failed:", e);
     return null;
   });
-  if (!session) { console.warn("[PING] No session - ping skipped"); return; }
+  if (!session) { console.warn("[PING] No session - ping skipped"); return false; }
   console.log("[PING] Session OK, user_id:", session.user_id, "email:", session.email);
   currentUserId = session.user_id;
-  sendSessionPing(session, 0);
+  const registered = await registerAuthoritativeBillingSession(session);
+  if (!registered) return false;
   sessionPingInterval = setInterval(() => {
     sendSessionPing(session, sessionCreditsTotal);
   }, 5000);
+  return true;
 }
 
 async function sendSessionPing(session, creditsUsed) {
-  console.log("[PING] ->", GCP_SERVER_URL, "user:", session?.user_id, "credits:", creditsUsed);
+  console.log("[SESSION SYNC]", {
+    user_id: session?.user_id || null,
+    session_id: currentSessionId || null,
+    credits_used: creditsUsed,
+    reconnect_state: reconnectManager.getSnapshot?.() || null,
+  });
   try {
     const res = await fetch(`${GCP_SERVER_URL}/session/ping`, {
       method:  "POST",
@@ -2345,6 +2355,13 @@ async function sendSessionPing(session, creditsUsed) {
     console.log("[PING] <-", res.status, res.ok ? "OK" : "FAILED");
     if (res.ok) {
       const data = await res.json().catch(() => ({}));
+      console.log("[SESSION ACTIVE]", {
+        user_id: session?.user_id || null,
+        session_id: currentSessionId || null,
+        authoritative_session_id: currentSessionId || null,
+        billing_mode: "server_authoritative",
+        sync_id: null,
+      });
       if (data.kill) {
         console.log("[PING] KILL SIGNAL - stopping session, reason:", data.reason || data.kill_reason);
         log("Session terminated by administrator", "warning");
@@ -2353,9 +2370,55 @@ async function sendSessionPing(session, creditsUsed) {
         const stats = await doStop({ suppressSummary: true, source: "final" });
         showAdminKillModal(data.reason || data.kill_reason, stats);
       }
+      return data;
     }
+    return null;
   } catch (err) {
     console.error("[PING] fetch error:", err.message);
+    return null;
+  }
+}
+
+async function registerAuthoritativeBillingSession(session) {
+  if (authoritativeSessionReady) return true;
+  if (authoritativeSessionRegistering) return false;
+  if (!session?.user_id || !currentSessionId) {
+    console.warn("[SESSION REGISTER] missing inputs", {
+      user_id: session?.user_id || null,
+      session_id: currentSessionId || null,
+      authoritative_session_id: currentSessionId || null,
+    });
+    return false;
+  }
+  authoritativeSessionRegistering = true;
+  console.log("[SESSION REGISTER]", {
+    user_id: session.user_id,
+    session_id: currentSessionId,
+    decart_session_id: null,
+    authoritative_session_id: currentSessionId,
+    reconnect_state: reconnectManager.getSnapshot?.() || null,
+    billing_mode: "server_authoritative",
+    sync_id: null,
+  });
+  try {
+    const data = await sendSessionPing(session, 0);
+    if (data && !data.kill && !data.current_session_invalid) {
+      authoritativeSessionReady = true;
+      console.log("[SESSION STORE]", {
+        user_id: session.user_id,
+        session_id: currentSessionId,
+        authoritative_session_id: currentSessionId,
+      });
+      return true;
+    }
+    console.warn("[SESSION REGISTER] failed", {
+      user_id: session.user_id,
+      session_id: currentSessionId,
+      reason: data?.reason || data?.kill_reason || "registration_failed",
+    });
+    return false;
+  } finally {
+    authoritativeSessionRegistering = false;
   }
 }
 
@@ -3639,7 +3702,7 @@ async function waitForCreditSyncToSettle(maxWaitMs = 5000) {
 }
 
 function createBillingSyncMetadata(source, durationSecs, credits) {
-  if (!currentSessionId) return null;
+  if (!currentSessionId || !authoritativeSessionReady) return null;
   billingSyncSequence += 1;
   const syncSequence = billingSyncSequence;
   return {
@@ -3684,11 +3747,29 @@ async function tickCredit() {
   // GCP sync every 5 seconds
   const unsyncedSec = sessionSecondsTotal - lastSyncedSeconds;
   if (unsyncedSec >= SYNC_INTERVAL_SEC && !_creditSyncInProgress && !_finalSyncInProgress) {
+    if (!currentSessionId || !authoritativeSessionReady) {
+      console.warn("[DEDUCT BLOCKED] missing authoritative session", {
+        session_id: currentSessionId || null,
+        authoritative_session_ready: authoritativeSessionReady,
+        source: "interval",
+        duration_secs: unsyncedSec,
+      });
+      return;
+    }
     _creditSyncInProgress = true;
     const creditsToSync = unsyncedSec * burnRate;
     lastSyncedSeconds   = sessionSecondsTotal;
     const creditsToDeduct = Math.ceil(creditsToSync);
     const metadata = createBillingSyncMetadata("interval", unsyncedSec, creditsToDeduct);
+    if (!metadata) {
+      console.warn("[DEDUCT BLOCKED] missing authoritative session", {
+        session_id: currentSessionId || null,
+        authoritative_session_ready: authoritativeSessionReady,
+        source: "interval",
+      });
+      _creditSyncInProgress = false;
+      return;
+    }
     try {
       const result = await window.tzurah.deductCredits(creditsToDeduct, unsyncedSec, metadata);
       if (typeof result?.remaining === "number") {
@@ -3715,7 +3796,17 @@ async function syncFinalCredits(source = "final") {
     }
     const burnRate = window._burnRate || 2.18;
     const creditsToDeduct = Math.ceil(unsyncedSec * burnRate);
+    if (!currentSessionId || !authoritativeSessionReady) {
+      console.warn("[DEDUCT BLOCKED] missing authoritative session", {
+        session_id: currentSessionId || null,
+        authoritative_session_ready: authoritativeSessionReady,
+        source,
+        duration_secs: unsyncedSec,
+      });
+      return;
+    }
     const metadata = createBillingSyncMetadata(source, unsyncedSec, creditsToDeduct);
+    if (!metadata) return;
     const result = await window.tzurah.deductCredits(
       creditsToDeduct, unsyncedSec, metadata
     );
@@ -3929,7 +4020,14 @@ async function stopSession() {
   if (fpsRafId) { cancelAnimationFrame(fpsRafId); fpsRafId = null; }
   if (fpsCounter) fpsCounter.style.display = "none";
   hideReconnectBanner();
+  console.log("[SESSION STOP]", {
+    session_id: currentSessionId || null,
+    authoritative_session_id: currentSessionId || null,
+    authoritative_session_ready: authoritativeSessionReady,
+  });
   currentSessionId   = null;
+  authoritativeSessionReady = false;
+  authoritativeSessionRegistering = false;
   renderPerformanceSnapshot();
 }
 
@@ -4080,6 +4178,17 @@ btnStart.addEventListener("click", async () => {
       window._lowCreditsWarned = false;
       currentSessionId    = crypto.randomUUID();
       currentUserId       = session.user_id;
+      authoritativeSessionReady = false;
+      authoritativeSessionRegistering = false;
+      console.log("[SESSION START]", {
+        user_id: currentUserId,
+        session_id: currentSessionId,
+        decart_session_id: null,
+        authoritative_session_id: currentSessionId,
+        reconnect_state: reconnectManager.getSnapshot?.() || null,
+        billing_mode: "server_authoritative",
+        sync_id: null,
+      });
       updateCreditsHeader(credits);
       updateCreditsAlerts(credits);
     }
@@ -4153,6 +4262,13 @@ btnStart.addEventListener("click", async () => {
       },
     });
 
+    if (isElectron) {
+      const registered = await startSessionPing();
+      if (!registered) {
+        throw new Error("Could not register authoritative billing session");
+      }
+    }
+
     isConnected  = true;
     setSessionState(SESSION_STATES.CONNECTED, { reason: "webrtc_connected" });
     perfMonitor.startSession();
@@ -4188,7 +4304,7 @@ btnStart.addEventListener("click", async () => {
           hasAppliedInitialSet = true;
           addCenterAlert("connection", "Connected to Decart  face swap active");
           realtimeStatus.showStatus("Streaming live", { level: "success" });
-          startSessionPing();
+          if (!sessionPingInterval) startSessionPing();
           if (btnRecord) { btnRecord.disabled = false; syncRecordActionButton(); }
           try {
             await applySet();
