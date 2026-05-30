@@ -465,7 +465,7 @@
       .video-row { grid-template-columns: 1fr; }
       .video-box { height: 230px; min-height: 230px; }
       .bottom-row { grid-template-columns: 1fr; }
-      .scene-preset-grid { grid-template-columns: 1fr; max-height: 104px; }
+      .scene-preset-grid { grid-template-columns: 1fr; }
       .scene-actions .btn { width: 100%; }
       .scene-status { min-width: 100%; }
     }
@@ -761,13 +761,19 @@
       padding-right: 2px;
       scrollbar-width: thin;
     }
+    .prompt-mode-scroll[data-panel="scenes"] {
+      overflow: hidden;
+      padding-right: 0;
+    }
     .prompt-mode-scroll::-webkit-scrollbar,
-    .prompt-chip-grid::-webkit-scrollbar {
+    .prompt-chip-grid::-webkit-scrollbar,
+    .scene-grid-scroll::-webkit-scrollbar {
       width: 4px;
       height: 4px;
     }
     .prompt-mode-scroll::-webkit-scrollbar-thumb,
-    .prompt-chip-grid::-webkit-scrollbar-thumb {
+    .prompt-chip-grid::-webkit-scrollbar-thumb,
+    .scene-grid-scroll::-webkit-scrollbar-thumb {
       background: var(--border);
       border-radius: 2px;
     }
@@ -844,13 +850,54 @@
       color: var(--text);
       line-height: 1.35;
     }
+    .scene-grid-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+      max-height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 2px 6px 2px 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(96,109,93,.78) rgba(247,243,227,.04);
+      overscroll-behavior: contain;
+    }
+    body[data-theme="light"] .scene-grid-scroll {
+      scrollbar-color: rgba(96,109,93,.68) rgba(1,22,39,.06);
+    }
+    .scene-grid-scroll::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    .scene-grid-scroll::-webkit-scrollbar-track {
+      background: rgba(247,243,227,.035);
+      border-radius: 999px;
+    }
+    body[data-theme="light"] .scene-grid-scroll::-webkit-scrollbar-track {
+      background: rgba(1,22,39,.055);
+    }
+    .scene-grid-scroll::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(96,109,93,.82), rgba(63,108,81,.88));
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    body[data-theme="light"] .scene-grid-scroll::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(96,109,93,.68), rgba(63,108,81,.72));
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .scene-grid-scroll::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(96,109,93,.95), rgba(63,108,81,.98));
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
     .scene-preset-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: 6px;
-      max-height: 102px;
-      overflow-y: auto;
-      padding-right: 2px;
+      min-height: min-content;
+      overflow: visible;
     }
     .prompt-chip-grid {
       min-height: 0;
@@ -1730,7 +1777,9 @@
             <button id="scene-favorites-filter" class="scene-filter-btn" type="button" aria-pressed="false">Favorites</button>
           </div>
           <div id="scene-category-row" class="scene-filter-row" aria-label="Scene categories"></div>
-          <div id="scene-preset-grid" class="scene-preset-grid prompt-chip-grid" aria-label="Scene presets"></div>
+          <div class="scene-grid-scroll" role="region" aria-label="Scrollable scene presets">
+            <div id="scene-preset-grid" class="scene-preset-grid" aria-label="Scene presets"></div>
+          </div>
           <div class="scene-actions prompt-compact-row">
             <span id="scene-status" class="scene-status">Select a scene for this or the next session.</span>
           </div>
