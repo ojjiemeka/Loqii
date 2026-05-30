@@ -753,6 +753,7 @@
       min-height: 0;
       overflow: hidden;
       display: flex;
+      height: 100%;
     }
     .prompt-mode-scroll {
       min-height: 0;
@@ -762,6 +763,9 @@
       scrollbar-width: thin;
     }
     .prompt-mode-scroll[data-panel="scenes"] {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
       overflow: hidden;
       padding-right: 0;
     }
@@ -778,12 +782,21 @@
       border-radius: 2px;
     }
     .scene-panel {
-      flex: 1;
+      flex: 1 1 auto;
       min-height: 0;
+      height: 100%;
+      max-height: 100%;
       overflow: hidden;
       display: flex;
       flex-direction: column;
       gap: 8px;
+    }
+    .scenes-fixed-controls {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
     }
     .scene-panel-head {
       display: flex;
@@ -851,10 +864,9 @@
       line-height: 1.35;
     }
     .scene-grid-scroll {
-      flex: 1 1 auto;
-      min-height: 0;
-      height: 100%;
-      max-height: 100%;
+      flex: 0 0 clamp(150px, 22vh, 240px);
+      min-height: 130px;
+      max-height: clamp(150px, 22vh, 240px);
       overflow-y: auto;
       overflow-x: hidden;
       padding: 2px 6px 2px 0;
@@ -898,6 +910,17 @@
       gap: 6px;
       min-height: min-content;
       overflow: visible;
+    }
+    @media (max-height: 760px) {
+      .scene-panel { gap: 6px; }
+      .scenes-fixed-controls { gap: 6px; }
+      .scene-grid-scroll {
+        flex-basis: clamp(126px, 19vh, 180px);
+        min-height: 120px;
+        max-height: clamp(126px, 19vh, 180px);
+      }
+      .scene-actions { gap: 4px; }
+      .scene-status { font-size: 0.64rem; line-height: 1.25; }
     }
     .prompt-chip-grid {
       min-height: 0;
@@ -1766,17 +1789,19 @@
       <div class="utility-panel prompt-mode-scroll" data-panel="scenes">
         <!-- Scene/background presets -->
         <div class="scene-panel" id="scene-panel">
-          <div class="scene-panel-head">
-            <div>
-              <span class="scene-title">Scenes</span>
-              <span id="scene-state" class="scene-state">No scene selected</span>
+          <div class="scenes-fixed-controls">
+            <div class="scene-panel-head">
+              <div>
+                <span class="scene-title">Scenes</span>
+                <span id="scene-state" class="scene-state">No scene selected</span>
+              </div>
             </div>
+            <div class="scene-toolbar">
+              <input id="scene-search" class="scene-search" type="search" placeholder="Search scenes">
+              <button id="scene-favorites-filter" class="scene-filter-btn" type="button" aria-pressed="false">Favorites</button>
+            </div>
+            <div id="scene-category-row" class="scene-filter-row" aria-label="Scene categories"></div>
           </div>
-          <div class="scene-toolbar">
-            <input id="scene-search" class="scene-search" type="search" placeholder="Search scenes">
-            <button id="scene-favorites-filter" class="scene-filter-btn" type="button" aria-pressed="false">Favorites</button>
-          </div>
-          <div id="scene-category-row" class="scene-filter-row" aria-label="Scene categories"></div>
           <div class="scene-grid-scroll" role="region" aria-label="Scrollable scene presets">
             <div id="scene-preset-grid" class="scene-preset-grid" aria-label="Scene presets"></div>
           </div>
