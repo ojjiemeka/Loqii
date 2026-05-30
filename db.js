@@ -189,8 +189,8 @@ function seedDevSession() {
     avatar_url:         null,
     credits_remaining:  99999,
     total_credits_used: 0,
-    access_token:       "dev-access-token",
-    refresh_token:      "dev-refresh-token",
+    access_token:       "placeholder-token",
+    refresh_token:      "placeholder-refresh",
     last_synced:        Date.now(),
   });
 }
