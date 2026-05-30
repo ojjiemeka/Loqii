@@ -2106,6 +2106,7 @@ import { LoqiiConfirm, LoqiiEmptyState, LoqiiLoadingState, LoqiiModal } from "./
 import { LoqiiDrawer } from "./loqiiDrawer.js";
 import { LoqiiToast } from "./loqiiToast.js";
 import { buildHelpMarkup } from "./loqiiHelp.js";
+import { initWatermarkRemover, destroyWatermarkRemover } from "./watermarkRemover.js";
 
 // Reusable app modal alert component. Keep this isolated so dialog behavior
 // can be debugged independently from streaming/session code.
@@ -4516,6 +4517,7 @@ async function resetRuntimeSessionState(reason = "runtime_reset") {
     if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
     webcamStream = null;
     if (inputVideo) inputVideo.srcObject = null;
+    destroyWatermarkRemover();
     if (outputVideo?.srcObject) {
       outputVideo.srcObject.getTracks?.().forEach(t => {
         try { t.stop(); } catch (_) {}
@@ -4784,9 +4786,12 @@ btnStart.addEventListener("click", async () => {
     const client = createDecartClient({ apiKey });
     realtimeClient = await client.realtime.connect(webcamStream, {
       model,
-      onRemoteStream: (transformedStream) => {
+      onRemoteStream: async (transformedStream) => {
         console.log("[DEBUG] onRemoteStream fired", transformedStream);
-        outputVideo.srcObject  = transformedStream;
+        const streamToUse = (window._featureFlags?.enable_watermark_removal !== false)
+          ? await initWatermarkRemover(transformedStream).catch(() => transformedStream)
+          : transformedStream;
+        outputVideo.srcObject  = streamToUse;
         outputVideo.muted      = false;
         outputPh.style.display = "none";
         btnObs.disabled        = false;
