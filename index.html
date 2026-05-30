@@ -2542,15 +2542,21 @@ function showAdminKillModal(reason, stats = {}) {
 
 async function endSessionPing() {
   if (sessionPingInterval) { clearInterval(sessionPingInterval); sessionPingInterval = null; }
-  if (!isElectron) return;
+  if (!isElectron) return { ok: false, skipped: true, reason: "not_electron" };
   const session = await window.tzurah.getSession().catch(() => null);
-  if (!session) return;
+  if (!session) return { ok: false, skipped: true, reason: "missing_session" };
   console.log("[PING] end ->", session.user_id);
-  fetch(`${GCP_SERVER_URL}/session/end`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ user_id: session.user_id, session_id: currentSessionId }),
-  }).catch((err) => console.error("[PING] end error:", err.message));
+  try {
+    const res = await fetch(`${GCP_SERVER_URL}/session/end`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ user_id: session.user_id, session_id: currentSessionId }),
+    });
+    return { ok: res.ok, status: res.status };
+  } catch (err) {
+    console.error("[PING] end error:", err.message);
+    return { ok: false, error: err.message };
+  }
 }
 
 //  Console logger 
@@ -3825,16 +3831,16 @@ async function tickCredit() {
 }
 
 async function syncFinalCredits(source = "final") {
-  if (!isElectron) return;
-  if (_finalSyncInProgress) return;
-  if (hasFinalSyncedSession) return;
+  if (!isElectron) return { ok: true, skipped: true, reason: "not_electron" };
+  if (_finalSyncInProgress) return { ok: false, skipped: true, reason: "final_sync_in_progress" };
+  if (hasFinalSyncedSession) return { ok: true, skipped: true, reason: "already_synced" };
   _finalSyncInProgress = true;
   try {
     await waitForCreditSyncToSettle();
     const unsyncedSec = sessionSecondsTotal - lastSyncedSeconds;
     if (unsyncedSec <= 0) {
       hasFinalSyncedSession = true;
-      return;
+      return { ok: true, skipped: true, reason: "nothing_to_sync" };
     }
     const burnRate = window._burnRate || 2.18;
     const creditsToDeduct = Math.ceil(unsyncedSec * burnRate);
@@ -3845,10 +3851,10 @@ async function syncFinalCredits(source = "final") {
         source,
         duration_secs: unsyncedSec,
       });
-      return;
+      return { ok: false, blocked: true, reason: "missing_authoritative_session" };
     }
     const metadata = createBillingSyncMetadata(source, unsyncedSec, creditsToDeduct);
-    if (!metadata) return;
+    if (!metadata) return { ok: false, blocked: true, reason: "missing_billing_metadata" };
     const result = await window.tzurah.deductCredits(
       creditsToDeduct, unsyncedSec, metadata
     );
@@ -3859,7 +3865,10 @@ async function syncFinalCredits(source = "final") {
     }
     lastSyncedSeconds = sessionSecondsTotal;
     hasFinalSyncedSession = true;
-  } catch (_) {}
+    return { ok: true, result };
+  } catch (err) {
+    return { ok: false, error: err?.message || "final_sync_failed" };
+  }
   finally {
     _finalSyncInProgress = false;
   }
@@ -4036,22 +4045,65 @@ function _renderOBSModal(obsUrl, onStart) {
 }
 
 //  Stop / cleanup 
-async function stopSession() {
+async function safeStopStep(label, fn) {
+  try {
+    console.log(`[STOP] ${label}`);
+    return await fn();
+  } catch (err) {
+    console.warn(`[STOP] warning cleanup failed: ${label}`, err?.message || err);
+    return null;
+  }
+}
+
+function clearRuntimeTimers() {
+  if (sessionPingInterval) { clearInterval(sessionPingInterval); sessionPingInterval = null; }
+  if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; }
+  if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
+  if (fpsRafId) { cancelAnimationFrame(fpsRafId); fpsRafId = null; }
+}
+
+async function resetRuntimeSessionState(reason = "runtime_reset") {
+  console.log("[STOP] clearing timers");
+  clearRuntimeTimers();
+
   isConnected          = false;
   hasAppliedInitialSet = false;
   lastGeneratingTime   = 0;
-  reconnectManager.reset();
-  perfMonitor.stopSession();
-  if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; }
-  if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
-  if (realtimeClient) { try { realtimeClient.disconnect(); } catch (_) {} realtimeClient = null; }
-  if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
-  inputVideo.srcObject   = null;
-  outputVideo.srcObject  = null;
-  inputPh.style.display  = "";
-  outputPh.style.display = "";
-  stopOBSStream();
-  stopStats();
+  _creditSyncInProgress = false;
+  _finalSyncInProgress = false;
+
+  await safeStopStep("decart cleanup", async () => {
+    if (realtimeClient) realtimeClient.disconnect();
+    realtimeClient = null;
+  });
+
+  await safeStopStep("media cleanup", async () => {
+    if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
+    webcamStream = null;
+    if (inputVideo) inputVideo.srcObject = null;
+    if (outputVideo?.srcObject) {
+      outputVideo.srcObject.getTracks?.().forEach(t => {
+        try { t.stop(); } catch (_) {}
+      });
+    }
+    if (outputVideo) outputVideo.srcObject = null;
+    inputPh.style.display  = "";
+    outputPh.style.display = "";
+  });
+
+  await safeStopStep("performance cleanup", async () => {
+    reconnectManager.reset();
+    perfMonitor.stopSession();
+    stopStats();
+    hideReconnectBanner();
+    if (fpsCounter) fpsCounter.style.display = "none";
+  });
+
+  await safeStopStep("auxiliary cleanup", async () => {
+    stopOBSStream();
+    if (isRecording) stopRecording();
+  });
+
   // Resume mic monitoring if a mic was selected (it keeps running between sessions)
   const savedMic = micSelect?.value;
   if (savedMic && savedMic !== "none" && !micStream) startMicMonitoring(savedMic);
@@ -4059,14 +4111,12 @@ async function stopSession() {
   btnApply.disabled  = true;
   btnObs.disabled    = true;
   if (btnRecord) { btnRecord.disabled = true; syncRecordActionButton(); }
-  if (fpsRafId) { cancelAnimationFrame(fpsRafId); fpsRafId = null; }
-  if (fpsCounter) fpsCounter.style.display = "none";
-  hideReconnectBanner();
   console.log("[SESSION STOP]", {
     session_id: currentSessionId || null,
     authoritative_session_id: currentSessionId || null,
     authoritative_session_ready: authoritativeSessionReady,
   });
+  console.log("[STOP] refs cleared", { reason });
   currentSessionId   = null;
   authoritativeSessionReady = false;
   authoritativeSessionRegistering = false;
@@ -4075,30 +4125,39 @@ async function stopSession() {
 
 async function doStop(options = {}) {
   if (_stopInProgress) return _stopPromise || { snapDuration: 0, snapUsed: 0, snapLeft: localCredits };
+  console.log("[STOP] requested", { source: options.source || "manual_stop" });
   _stopInProgress = true;
+  console.log("[STOP] state -> stopping");
   setSessionState(SESSION_STATES.STOPPING, { reason: options.source || "manual_stop" });
   _stopPromise = (async () => {
   const { suppressSummary = false, source = "manual_stop" } = options;
   log("Stopping session...", "info");
 
   // Disconnect SDK immediately to stop Decart billing
-  try {
-    if (realtimeClient) { realtimeClient.disconnect(); realtimeClient = null; }
-  } catch (_) {}
+  await safeStopStep("decart cleanup", async () => {
+    if (realtimeClient) realtimeClient.disconnect();
+    realtimeClient = null;
+  });
 
   const snapDuration = sessionSecondsTotal;
   const snapUsed     = sessionCreditsTotal;
 
-  await syncFinalCredits(source);
+  console.log("[STOP] final sync start", { source, session_id: currentSessionId || null });
+  const finalSyncResult = await syncFinalCredits(source);
+  console.log("[STOP] final sync result", finalSyncResult);
+  if (finalSyncResult && finalSyncResult.ok === false && !finalSyncResult.skipped) {
+    log("Session ended, but final billing sync could not be confirmed. You can start again.", "warning");
+  }
   if (snapDuration > 0) {
-    endSessionPing();
+    const pingEndResult = await endSessionPing();
+    console.log("[STOP] session end result", pingEndResult);
   } else {
     if (sessionPingInterval) { clearInterval(sessionPingInterval); sessionPingInterval = null; }
   }
 
   const snapLeft = localCredits;
 
-  await stopSession();
+  await resetRuntimeSessionState(source);
 
   sessionSecondsTotal = 0;
   sessionCreditsTotal = 0;
@@ -4106,8 +4165,6 @@ async function doStop(options = {}) {
   billingSyncSequence = 0;
   hasFinalSyncedSession = false;
 
-  setStatus("", "Disconnected");
-  setSessionState(SESSION_STATES.IDLE, { reason: "stopped" });
   log("Session stopped", "warning");
 
   if (snapDuration > 0 && !suppressSummary) {
@@ -4122,6 +4179,10 @@ async function doStop(options = {}) {
   } finally {
     _stopInProgress = false;
     _stopPromise = null;
+    setStatus("", "Disconnected");
+    console.log("[STOP] state -> idle");
+    setSessionState(SESSION_STATES.IDLE, { reason: "stopped" });
+    console.log("[STOP] complete");
   }
 }
 
@@ -4393,16 +4454,10 @@ btnStart.addEventListener("click", async () => {
     errorBoundary.capture("Session start", err);
     setSessionState(SESSION_STATES.FAILED, { reason: "start_failed" });
     setStatus("error", "Error");
-    try { if (realtimeClient) { realtimeClient.disconnect(); realtimeClient = null; } } catch (_) {}
-    if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
-    inputVideo.srcObject = null;
-    outputVideo.srcObject = null;
-    inputPh.style.display = "";
-    outputPh.style.display = "";
-    log("Session start failed. Decart stream cleaned up.", "warning");
-    await stopSession();
-    btnStart.disabled = false;
+    log("Session start failed. Cleaning runtime session state.", "warning");
+    await resetRuntimeSessionState("start_failed");
     _startInProgress = false;
+    setSessionState(SESSION_STATES.IDLE, { reason: "start_failed_cleanup" });
   }
 });
 
