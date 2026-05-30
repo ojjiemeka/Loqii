@@ -2334,7 +2334,19 @@ async function startSessionPing() {
   return true;
 }
 
-async function sendSessionPing(session, creditsUsed) {
+async function sendSessionPing(session, creditsUsed, options = {}) {
+  const endpoint = isElectron ? "http://localhost:3000/session/ping" : `${GCP_SERVER_URL}/session/ping`;
+  const accessToken = options.accessToken || await window.tzurah?.getAccessToken?.().catch(() => null);
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const body = {
+    user_id:      session.user_id,
+    email:        session.email,
+    credits_used: creditsUsed,
+    session_id:   currentSessionId,
+    client_ts:    new Date().toISOString(),
+    source:       creditsUsed === 0 ? "session_register" : "session_ping",
+  };
   console.log("[SESSION SYNC]", {
     user_id: session?.user_id || null,
     session_id: currentSessionId || null,
@@ -2342,19 +2354,18 @@ async function sendSessionPing(session, creditsUsed) {
     reconnect_state: reconnectManager.getSnapshot?.() || null,
   });
   try {
-    const res = await fetch(`${GCP_SERVER_URL}/session/ping`, {
+    const res = await fetch(endpoint, {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        user_id:      session.user_id,
-        email:        session.email,
-        credits_used: creditsUsed,
-        session_id:   currentSessionId,
-      }),
+      headers,
+      body:    JSON.stringify(body),
     });
-    console.log("[PING] <-", res.status, res.ok ? "OK" : "FAILED");
+    const data = await res.json().catch(() => ({}));
+    console.log("[SESSION REGISTER] response", {
+      status: res.status,
+      ok: res.ok,
+      body: data,
+    });
     if (res.ok) {
-      const data = await res.json().catch(() => ({}));
       console.log("[SESSION ACTIVE]", {
         user_id: session?.user_id || null,
         session_id: currentSessionId || null,
@@ -2372,10 +2383,23 @@ async function sendSessionPing(session, creditsUsed) {
       }
       return data;
     }
-    return null;
+    return {
+      ok: false,
+      status: res.status,
+      error: data?.error || data?.reason || "session_ping_failed",
+      body: data,
+    };
   } catch (err) {
-    console.error("[PING] fetch error:", err.message);
-    return null;
+    console.error("[SESSION REGISTER] failure", {
+      endpoint,
+      type: err?.name || "fetch_error",
+      message: err?.message || String(err),
+    });
+    return {
+      ok: false,
+      error: err?.message || "fetch_error",
+      type: err?.name || "fetch_error",
+    };
   }
 }
 
@@ -2391,18 +2415,34 @@ async function registerAuthoritativeBillingSession(session) {
     return false;
   }
   authoritativeSessionRegistering = true;
-  console.log("[SESSION REGISTER]", {
+  let tokenAge = null;
+  let tokenPresent = false;
+  let accessTokenForPing = null;
+  try {
+    accessTokenForPing = await window.tzurah.getAccessToken?.();
+    tokenPresent = !!accessTokenForPing;
+    if (accessTokenForPing) {
+      const payload = JSON.parse(atob(accessTokenForPing.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      tokenAge = typeof payload.iat === "number" ? Math.max(0, Math.round(Date.now() / 1000 - payload.iat)) : null;
+    }
+  } catch (_) {}
+  console.log("[SESSION REGISTER] request", {
+    endpoint: isElectron ? "http://localhost:3000/session/ping" : `${GCP_SERVER_URL}/session/ping`,
     user_id: session.user_id,
+    email: session.email || null,
     session_id: currentSessionId,
     decart_session_id: null,
     authoritative_session_id: currentSessionId,
+    token_present: tokenPresent,
+    token_age_seconds: tokenAge,
+    request_body_keys: ["user_id", "email", "credits_used", "session_id", "client_ts", "source"],
     reconnect_state: reconnectManager.getSnapshot?.() || null,
     billing_mode: "server_authoritative",
     sync_id: null,
   });
   try {
-    const data = await sendSessionPing(session, 0);
-    if (data && !data.kill && !data.current_session_invalid) {
+    const data = await sendSessionPing(session, 0, { accessToken: accessTokenForPing });
+    if (data?.ok === true && !data.kill && !data.current_session_invalid) {
       authoritativeSessionReady = true;
       console.log("[SESSION STORE]", {
         user_id: session.user_id,
@@ -2414,7 +2454,9 @@ async function registerAuthoritativeBillingSession(session) {
     console.warn("[SESSION REGISTER] failed", {
       user_id: session.user_id,
       session_id: currentSessionId,
-      reason: data?.reason || data?.kill_reason || "registration_failed",
+      status: data?.status || null,
+      reason: data?.reason || data?.kill_reason || data?.error || "registration_failed",
+      body: data?.body || data || null,
     });
     return false;
   } finally {
@@ -4263,9 +4305,11 @@ btnStart.addEventListener("click", async () => {
     });
 
     if (isElectron) {
+      setStatus("connecting", "Registering billing session...");
+      log("Registering billing session...", "info");
       const registered = await startSessionPing();
       if (!registered) {
-        throw new Error("Could not register authoritative billing session");
+        throw new Error("Could not start billing session. Please try again.");
       }
     }
 
@@ -4349,6 +4393,13 @@ btnStart.addEventListener("click", async () => {
     errorBoundary.capture("Session start", err);
     setSessionState(SESSION_STATES.FAILED, { reason: "start_failed" });
     setStatus("error", "Error");
+    try { if (realtimeClient) { realtimeClient.disconnect(); realtimeClient = null; } } catch (_) {}
+    if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+    inputVideo.srcObject = null;
+    outputVideo.srcObject = null;
+    inputPh.style.display = "";
+    outputPh.style.display = "";
+    log("Session start failed. Decart stream cleaned up.", "warning");
     await stopSession();
     btnStart.disabled = false;
     _startInProgress = false;

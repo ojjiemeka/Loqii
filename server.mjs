@@ -745,6 +745,44 @@ function buildApp() {
     }
   });
 
+  app.post(["/session/ping", "/api/session/ping"], async (req, res) => {
+    const authHeader = req.headers.authorization || "";
+    const body = req.body || {};
+    console.log("[SESSION REGISTER] proxy request", {
+      endpoint: "/session/ping",
+      user_id: body.user_id || null,
+      email: body.email || null,
+      session_id: body.session_id || null,
+      auth_present: String(authHeader).startsWith("Bearer "),
+      request_body_keys: Object.keys(body),
+    });
+    try {
+      const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
+      const gcpRes = await fetch(`${gcpUrl}/session/ping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000),
+      });
+      const data = await gcpRes.json().catch(() => ({}));
+      console.log("[SESSION REGISTER] proxy response", {
+        status: gcpRes.status,
+        ok: gcpRes.ok,
+        body: data,
+      });
+      return res.status(gcpRes.status).json(data);
+    } catch (err) {
+      console.error("[SESSION REGISTER] proxy failure", {
+        type: err?.name || "fetch_error",
+        message: err?.message || String(err),
+      });
+      return res.status(503).json({ ok: false, error: "Session ping unavailable", reason: err?.message || "fetch_error" });
+    }
+  });
+
   return app;
 }
 
