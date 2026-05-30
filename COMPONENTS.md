@@ -354,6 +354,9 @@ Rules:
 - Login-vs-main-app routing is owned by Electron window factories in `electron.js`.
 - Explicit sign out is owned by `auth:logout`; it calls Supabase sign-out, clears SQLite session cache, rebuilds the login surface, and refreshes tray state.
 - Feature flags refresh after restore from renderer `/api/app-config`; balance refresh after restore is triggered from Electron main process.
+- Loqii consumes admin-resolved feature flags as runtime truth through `refreshFeatureFlags()`, `isFeatureEnabled(flagKey)`, and `window.currentFeatureFlags`.
+- Public/local fallback flags must be user-safe: diagnostics, mock payments, and developer panels stay hidden unless backend flags or explicit local dev mode enable them.
+- Hot flag refresh may update user-facing surfaces such as Help, onboarding, scenes/styles, OBS, diagnostics, and light mode without restarting an active realtime session.
 
 ## Production Config Ownership
 

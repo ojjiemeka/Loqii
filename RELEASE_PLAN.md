@@ -182,6 +182,7 @@ Future option:
 - Reopen while logged in restores the Supabase session; explicit Sign Out clears the cached session and returns to login on next launch.
 - Google OAuth verified through system-browser deep link without duplicate Electron windows, or disabled by app feature flag.
 - Help, onboarding, diagnostics, scene/style engines, light mode, mock payments, and developer tools verified behind admin-controlled app flags.
+- Feature flag hot refresh verified to update non-critical UI without restarting or mutating an active realtime session.
 - Billing reconciliation dashboard healthy or degraded only with understood resolved historical events.
 - Normal users proven to route to production Decart.
 - Dev/test users proven to route to dev Decart only when explicitly allowed.

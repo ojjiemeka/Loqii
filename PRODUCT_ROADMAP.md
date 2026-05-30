@@ -68,6 +68,11 @@ Future product work must not regress the confirmed bootstrap/public config path,
 
 Status: Phase 8D adds the admin-owned app flag control plane and Loqii resolved-flag consumption. Remaining beta work is manual QA of each flag path with normal, dev-account, and allowlisted users.
 
+Phase 8C control-plane update:
+- Admin Dev owns searchable grouped app flags, scopes, allowlists, and resolved user preview.
+- Loqii refreshes resolved flags after auth and on a timed/visibility hot refresh without restarting active sessions.
+- Compatibility aliases keep `enable_scene_engine`/`enable_scene_system` and `enable_style_engine`/`enable_style_system` aligned.
+
 ## Beta Blockers
 
 - Manual verification of Google OAuth callback on a clean Windows machine.

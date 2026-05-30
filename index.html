@@ -2001,8 +2001,12 @@ const APP_FLAG_DEFAULTS = {
   onboarding_required: false,
   enable_google_oauth: false,
   enable_scene_engine: true,
+  enable_scene_system: true,
   enable_style_engine: true,
+  enable_style_system: true,
   enable_background_mode: true,
+  enable_obs_tools: true,
+  enable_beta_updater: false,
   enable_new_modals: true,
   enable_advanced_diagnostics: false,
   enable_help_center: true,
@@ -2037,13 +2041,23 @@ function isConfigDegraded() {
 }
 
 function normalizeAppFeatureFlags(flags = {}) {
-  return {
+  const normalized = {
     ...APP_FLAG_DEFAULTS,
     ...flags,
     enable_mock_payments: flags.enable_mock_payments ?? flags.mock_payments ?? APP_FLAG_DEFAULTS.enable_mock_payments,
+    enable_scene_engine: flags.enable_scene_engine ?? flags.enable_scene_system ?? APP_FLAG_DEFAULTS.enable_scene_engine,
+    enable_scene_system: flags.enable_scene_system ?? flags.enable_scene_engine ?? APP_FLAG_DEFAULTS.enable_scene_system,
     enable_background_mode: flags.enable_background_mode ?? flags.enable_background ?? APP_FLAG_DEFAULTS.enable_background_mode,
     enable_style_engine: flags.enable_style_engine ?? flags.enable_style_mode ?? APP_FLAG_DEFAULTS.enable_style_engine,
+    enable_style_system: flags.enable_style_system ?? flags.enable_style_engine ?? flags.enable_style_mode ?? APP_FLAG_DEFAULTS.enable_style_system,
+    enable_obs_tools: flags.enable_obs_tools ?? APP_FLAG_DEFAULTS.enable_obs_tools,
+    enable_beta_updater: flags.enable_beta_updater ?? APP_FLAG_DEFAULTS.enable_beta_updater,
   };
+  normalized.enable_scene_engine = normalized.enable_scene_engine === true || normalized.enable_scene_system === true;
+  normalized.enable_scene_system = normalized.enable_scene_system === true || normalized.enable_scene_engine === true;
+  normalized.enable_style_engine = normalized.enable_style_engine === true || normalized.enable_style_system === true;
+  normalized.enable_style_system = normalized.enable_style_system === true || normalized.enable_style_engine === true;
+  return normalized;
 }
 
 function isFeatureEnabled(key, fallback = false) {
@@ -2063,9 +2077,11 @@ function updateFeatureGatedSurfaces() {
   const backgroundEnabled = isFeatureEnabled("enable_background_mode", true);
   const styleEnabled = isFeatureEnabled("enable_style_engine", true);
   const lightModeEnabled = isFeatureEnabled("enable_light_mode", true);
+  const obsEnabled = isFeatureEnabled("enable_obs_tools", true);
 
   if (btnHelpHdr) btnHelpHdr.style.display = helpEnabled ? "" : "none";
   if (btnTopupHdr) btnTopupHdr.style.display = topupEnabled ? "" : "none";
+  if (btnObs) btnObs.style.display = obsEnabled ? "" : "none";
   setFeatureSurfaceVisible('[data-panel="scenes"], #btn-scene-apply, #btn-scene-reset', sceneEnabled);
   setFeatureSurfaceVisible('[data-panel="background"], #mode-bg', backgroundEnabled);
   setFeatureSurfaceVisible('[data-panel="style"], #mode-style', styleEnabled);
@@ -2081,6 +2097,7 @@ function updateFeatureGatedSurfaces() {
 
 function applyAppFeatureFlags(flags = {}) {
   window._featureFlags = normalizeAppFeatureFlags(flags);
+  window.currentFeatureFlags = window._featureFlags;
   if (btnSettingsHdr) btnSettingsHdr.style.display = "";
   if (document.body) {
     document.body.dataset.devTools = isDevMode() ? "1" : "0";
@@ -2101,6 +2118,7 @@ async function refreshFeatureFlags() {
     const data = await res.json();
     const nextFlags = data.app_flags || data.feature_flags || {};
     if (data.degraded === true) markConfigDegraded(data.degraded_reason || "Backend config unavailable");
+    window._appFlagMetadata = data.metadata || {};
     applyAppFeatureFlags(nextFlags);
     window._isDevAccount = data.is_dev_account === true;
     window._appFlagEnvironment = data.environment || "user";
@@ -2115,8 +2133,20 @@ async function refreshFeatureFlags() {
 
 window.getFeatureFlag = (key, fallback = false) => getFeatureFlag(window._featureFlags, key, fallback);
 window.isFeatureEnabled = isFeatureEnabled;
+window.getCurrentFeatureFlags = () => ({ ...(window._featureFlags || {}) });
 window.refreshFeatureFlags = refreshFeatureFlags;
 window.isConfigDegraded = isConfigDegraded;
+
+let featureFlagRefreshTimer = null;
+function startFeatureFlagHotRefresh() {
+  if (featureFlagRefreshTimer) return;
+  featureFlagRefreshTimer = setInterval(() => {
+    refreshFeatureFlags().catch(() => {});
+  }, 60000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshFeatureFlags().catch(() => {});
+  });
+}
 
 function setLoqiiTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -6010,6 +6040,7 @@ window.addEventListener("load", () => {
   }
 
   await loadFeatureFlags();
+  startFeatureFlagHotRefresh();
   await initSlots();
   renderPresets(MODE_PRESETS[currentMode]);
   renderPerformanceSnapshot();
