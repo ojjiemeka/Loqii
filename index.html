@@ -2966,6 +2966,7 @@ let activeSlotIndex  = Math.min(
   parseInt(localStorage.getItem(ACTIVE_KEY) || "0", 10),
   SLOT_COUNT - 1
 );
+let currentIdentityState = null;
 
 function loadSlots() {
   try {
@@ -2999,10 +3000,110 @@ function base64ToFile(base64, filename) {
   } catch { return null; }
 }
 
+function getImageSourceType(imageData) {
+  if (!imageData) return "none";
+  if (String(imageData).startsWith("data:")) return "base64";
+  if (String(imageData).startsWith("blob:")) return "blob";
+  if (/^https?:\/\//i.test(String(imageData))) return "url";
+  return "unknown";
+}
+
+function getImageByteLength(imageData) {
+  if (!imageData) return 0;
+  const value = String(imageData);
+  const payload = value.includes(",") ? value.split(",").pop() : value;
+  return Math.round(payload.length * 0.75);
+}
+
+function createIdentityStateFromSlot(index = activeSlotIndex) {
+  const slot = identitySlots[index];
+  if (!slot) return null;
+  return {
+    id: `slot-${index + 1}`,
+    slotIndex: index,
+    name: slot.name || `Identity ${index + 1}`,
+    image: slot.imageData || null,
+    imageName: slot.imageName || "identity.jpg",
+    imageType: getImageSourceType(slot.imageData),
+    prompt: `Use the selected identity reference image named "${slot.name || `Identity ${index + 1}`}". Preserve the selected person's face, facial identity, expression, skin tone, outfit, pose, and body shape unless explicitly requested otherwise.`,
+    selectedAt: new Date().toISOString(),
+  };
+}
+
+function updateCurrentIdentityState(reason = "identity_update") {
+  currentIdentityState = createIdentityStateFromSlot(activeSlotIndex);
+  console.log("[IDENTITY] selected", {
+    id: currentIdentityState?.id || null,
+    name: currentIdentityState?.name || null,
+    hasImage: !!currentIdentityState?.image,
+    image_source_type: currentIdentityState?.imageType || "none",
+    image_byte_length: getImageByteLength(currentIdentityState?.image),
+    reason,
+  });
+  return currentIdentityState;
+}
+
+function getCurrentIdentitySnapshot() {
+  if (!currentIdentityState || currentIdentityState.slotIndex !== activeSlotIndex) {
+    updateCurrentIdentityState("snapshot_refresh");
+  }
+  return currentIdentityState;
+}
+
 function getActiveRefImage() {
-  const slot = identitySlots[activeSlotIndex];
-  if (!slot || !slot.imageData) return null;
-  return base64ToFile(slot.imageData, slot.imageName || "identity.jpg");
+  const identity = getCurrentIdentitySnapshot();
+  if (!identity?.image) return null;
+  return base64ToFile(identity.image, identity.imageName || "identity.jpg");
+}
+
+async function applyIdentityReferenceToDecart(identity, session = realtimeClient) {
+  if (!session) throw new Error("Decart session is not ready for identity apply");
+  if (!identity?.image) throw new Error("Selected identity image is missing. Re-select identity.");
+  const img = base64ToFile(identity.image, identity.imageName || "identity.jpg");
+  if (!img) throw new Error("Selected identity image is missing. Re-select identity.");
+
+  const promptText = composePrompt({
+    identityLayer: identity.prompt,
+    safetyLayer: "Lock the face/person from the selected reference image before applying any background or style changes. Do not replace the selected identity.",
+  }).prompt;
+  const method = typeof session.set === "function" ? "session.set" : "setImage+setPrompt";
+  console.log("[DECART APPLY] identity", {
+    method,
+    identity_id: identity.id,
+    identity_name: identity.name,
+    hasImage: true,
+    hasPrompt: true,
+    image_source_type: identity.imageType,
+  });
+
+  const setStartedAt = performance.now();
+  try {
+    if (typeof session.set === "function") {
+      await session.set({ prompt: promptText, image: img, enhance: true });
+    } else {
+      if (typeof session.setImage === "function") await session.setImage(img);
+      await session.setPrompt(promptText, { enhance: true });
+    }
+    perfMonitor.markPromptUpdate();
+    perfMonitor.markDecartRtt(performance.now() - setStartedAt);
+    renderPerformanceSnapshot();
+    console.log("[DECART APPLY] result", {
+      ok: true,
+      phase: "identity_reference",
+      identity_id: identity.id,
+      hasImage: true,
+    });
+    return true;
+  } catch (err) {
+    console.warn("[DECART APPLY] result", {
+      ok: false,
+      phase: "identity_reference",
+      identity_id: identity.id,
+      hasImage: true,
+      error: err?.message || String(err),
+    });
+    throw err;
+  }
 }
 
 function renderIdentitySlots() {
@@ -3062,6 +3163,7 @@ function renderIdentitySlots() {
 function selectSlot(i) {
   activeSlotIndex = i;
   localStorage.setItem(ACTIVE_KEY, String(i));
+  updateCurrentIdentityState("slot_selected");
   renderIdentitySlots();
   // If running and slot has an image, live-apply
   if (isConnected && realtimeClient && identitySlots[i].imageData) {
@@ -3072,6 +3174,7 @@ function selectSlot(i) {
 function clearSlot(i) {
   identitySlots[i].imageData = null;
   identitySlots[i].imageName = null;
+  if (i === activeSlotIndex) updateCurrentIdentityState("slot_cleared");
   saveSlots(); // localStorage fallback
   saveSlotToIDB(i).catch(() => {}); // keep IDB in sync
   renderIdentitySlots();
@@ -3096,6 +3199,7 @@ slotFileInput.addEventListener("change", async (e) => {
       const compressed = await compressImage(ev.target.result);
       identitySlots[activeSlotIndex].imageData = compressed;
       identitySlots[activeSlotIndex].imageName = f.name;
+      updateCurrentIdentityState("identity_loaded");
       await saveSlotToIDB(activeSlotIndex);
       renderIdentitySlots();
       log(`Identity ${activeSlotIndex + 1}: loaded ${f.name} (${Math.round(compressed.length * 0.75 / 1024)}KB compressed)`);
@@ -3120,6 +3224,7 @@ slotNameInput.addEventListener("change", () => {
   const val = slotNameInput.value.trim();
   if (!val) return;
   identitySlots[activeSlotIndex].name = val;
+  updateCurrentIdentityState("identity_renamed");
   saveSlots(); // localStorage fallback
   saveSlotToIDB(activeSlotIndex).catch(() => {}); // keep IDB in sync
   renderIdentitySlots();
@@ -3292,8 +3397,8 @@ async function applyDecartScenePreset(session, preset) {
   if (typeof session.set === "function") {
     await session.set({ prompt: promptText, image: img || undefined, enhance: true });
   } else {
-    await session.setPrompt(promptText, { enhance: true });
     if (img && typeof session.setImage === "function") await session.setImage(img);
+    await session.setPrompt(promptText, { enhance: true });
   }
   perfMonitor.markPromptUpdate();
   perfMonitor.markDecartRtt(performance.now() - setStartedAt);
@@ -4272,6 +4377,23 @@ btnStart.addEventListener("click", async () => {
         setSessionState(SESSION_STATES.IDLE, { reason: "insufficient_credits" });
         return;
       }
+      const identitySnapshot = updateCurrentIdentityState("session_start_snapshot");
+      console.log("[SESSION START] identity snapshot", {
+        selectedIdentityId: identitySnapshot?.id || null,
+        selectedIdentityName: identitySnapshot?.name || null,
+        hasIdentityImage: !!identitySnapshot?.image,
+        hasIdentityPrompt: !!identitySnapshot?.prompt,
+        image_source_type: identitySnapshot?.imageType || "none",
+        scene: getSelectedScenePreset()?.name || null,
+        style: findStyle(activeStyleId)?.name || null,
+        background: currentMode === "background" ? "prompt_background" : null,
+      });
+      if (!identitySnapshot?.image) {
+        throw new Error("Select an identity before starting.");
+      }
+      if (!base64ToFile(identitySnapshot.image, identitySnapshot.imageName || "identity.jpg")) {
+        throw new Error("Selected identity image is missing. Re-select identity.");
+      }
       localCredits        = credits;
       sessionSecondsTotal = 0;
       sessionCreditsTotal = 0;
@@ -4364,6 +4486,14 @@ btnStart.addEventListener("click", async () => {
         }
       },
     });
+
+    const identityForSession = getCurrentIdentitySnapshot();
+    setStatus("connecting", "Applying identity...");
+    log("Applying selected identity...", "info");
+    await applyIdentityReferenceToDecart(identityForSession, realtimeClient);
+    await applySet();
+    hasAppliedInitialSet = true;
+    log("Selected identity applied", "success");
 
     if (isElectron) {
       setStatus("connecting", "Registering billing session...");
@@ -4464,6 +4594,7 @@ btnStart.addEventListener("click", async () => {
 //  Apply set 
 async function applySet(retries = 3) {
   if (!realtimeClient) return;
+  const identity = getCurrentIdentitySnapshot();
   const basePrompt = promptEl.value.trim() || "Substitute the character in the video with a person.";
   const val = currentIntensity;
   const scenePreset = getSelectedScenePreset();
@@ -4475,8 +4606,8 @@ async function applySet(retries = 3) {
   ].join(" ") : "";
   const composed = composePrompt({
     identityLayer: currentMode === "face"
-      ? `${buildIntensityLayer("face", val)} ${basePrompt}`
-      : "Preserve the current person and facial identity.",
+      ? `${identity?.prompt || "Use the selected identity reference image. Preserve the selected person's facial identity."} ${buildIntensityLayer("face", val)} ${basePrompt}`
+      : `${identity?.prompt || "Preserve the current person and facial identity."}`,
     backgroundLayer: currentMode === "background" ? `${basePrompt} ${buildIntensityLayer("background", val)}` : sceneLayer,
     styleLayer: currentMode === "style" ? `${basePrompt} ${buildIntensityLayer("style", val)}` : activeStyle?.prompt,
     enhancementLayer: currentMode !== "face" ? buildIntensityLayer(currentMode, val) : "",
@@ -4495,6 +4626,14 @@ async function applySet(retries = 3) {
   }));
 
   const img = getActiveRefImage();
+  console.log("[DECART APPLY] identity", {
+    method: typeof realtimeClient.set === "function" ? "session.set" : "setImage+setPrompt",
+    identity_id: identity?.id || null,
+    identity_name: identity?.name || null,
+    hasImage: !!img,
+    hasPrompt: !!identity?.prompt,
+    image_source_type: identity?.imageType || "none",
+  });
   log(`set() prompt: "${promptText.slice(0,60)}${promptText.length>60?"...":""}"`, "send");
   log(`Prompt layers: ${composed.activeLayers.join(", ")}`, "info");
   if (img) log(` set()  image: ${img.name} (${(img.size/1024).toFixed(0)} KB)`, "send");
@@ -4505,8 +4644,8 @@ async function applySet(retries = 3) {
       if (typeof realtimeClient.set === "function") {
         await realtimeClient.set({ prompt: promptText, image: img || undefined, enhance: true });
       } else {
-        await realtimeClient.setPrompt(promptText, { enhance: true });
         if (img) await realtimeClient.setImage(img);
+        await realtimeClient.setPrompt(promptText, { enhance: true });
       }
       perfMonitor.markPromptUpdate();
       perfMonitor.markDecartRtt(performance.now() - setStartedAt);
@@ -4521,6 +4660,11 @@ async function applySet(retries = 3) {
         };
       }
       log("Prompt & image accepted", "success");
+      console.log("[DECART APPLY] result", {
+        ok: true,
+        identity_id: identity?.id || null,
+        hasImage: !!img,
+      });
       return;
     } catch (err) {
       if (attempt < retries) {
@@ -4528,6 +4672,12 @@ async function applySet(retries = 3) {
         await new Promise(r => setTimeout(r, 1000 * attempt));
       } else {
         log(`set() failed after ${retries} attempts: ${err.message}`, "error");
+        console.warn("[DECART APPLY] result", {
+          ok: false,
+          identity_id: identity?.id || null,
+          hasImage: !!img,
+          error: err?.message || String(err),
+        });
         throw err;
       }
     }
@@ -4840,6 +4990,7 @@ async function initSlots() {
   } catch (e) {
     identitySlots = loadSlots();
   }
+  updateCurrentIdentityState("slots_initialized");
   renderIdentitySlots();
 }
 
