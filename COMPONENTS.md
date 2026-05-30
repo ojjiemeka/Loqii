@@ -52,6 +52,12 @@ Risk classes:
 
 High-risk and dangerous work requires topology notes, rollback plan, explicit tests, and no broad refactor.
 
+## Current Stable Runtime Baseline
+
+The current stable runtime baseline is documented in `CHECKPOINT_RUNTIME_STABLE_2026_05_29.md`.
+
+Before changing session/start/stop/auth/Decart/billing code, read that checkpoint and preserve its invariants for public config boot, Decart client-token flow, identity handoff order, authoritative session registration, stop cleanup, billing deduct, fresh `session_id` generation, and repo separation.
+
 ## Electron App UI
 
 Location: `index.html`

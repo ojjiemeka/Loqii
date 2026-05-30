@@ -15,6 +15,12 @@ Release work must declare repo scope (`Loqii only`, `Tzurah-AI only`, or `both r
 
 Never use `git add -A`. Always use the approved sync script for the touched repo.
 
+## Current Stable Runtime Baseline
+
+The current stable runtime baseline is `CHECKPOINT_RUNTIME_STABLE_2026_05_29.md`.
+
+Release-affecting work must preserve the checkpointed dev startup, public config boot, Decart client-token flow, identity handoff order, authoritative session registration, billing deduct, start/stop/restart recovery, fresh `session_id` behavior, and Loqii/Tzurah-AI repo separation.
+
 ## Repository And Sync Boundaries
 
 Current structure:

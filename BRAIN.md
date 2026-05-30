@@ -22,3 +22,4 @@ Short, high-signal lessons only. Add durable rules, not session notes.
 - Dev degraded mode may unblock login, never backend-owned truth.
 - Public config may identify the app; privileged bootstrap may trust the app.
 - Normal dev boot should not test privileged trust unless explicitly asked.
+- Before changing session/start/stop/auth/Decart/billing code, read `CHECKPOINT_RUNTIME_STABLE_2026_05_29.md` and preserve its runtime invariants.

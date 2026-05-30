@@ -6,6 +6,12 @@ Every non-trivial Loqii change starts by reading `AGENT.md`, `BRAIN.md`, `COMPON
 
 The product roadmap must not become a scratchpad. Add only durable product, release, diagnostics, or safety decisions that affect future work.
 
+## Current Stable Runtime Baseline
+
+The current stable runtime baseline is documented in `CHECKPOINT_RUNTIME_STABLE_2026_05_29.md`.
+
+Future product work must not regress the confirmed bootstrap/public config path, Decart client-token flow, dev/prod routing, identity handoff order, authoritative session registration, start/stop/restart recovery, billing sync/deduct behavior, or repo separation.
+
 ## Completed Systems
 
 - Split repositories: Loqii app source is separate from Tzurah-AI server/admin deploy.
