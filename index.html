@@ -447,6 +447,13 @@
       gap: 12px;
       overflow: hidden;
     }
+    /*
+      Layout QA tiers:
+      - compact laptop: <= 780px tall compresses chrome/video/cards first.
+      - standard laptop: 781-900px keeps denser spacing with more scene rows.
+      - desktop: > 900px uses the default roomy layout.
+      Scrollable regions must keep min-height:0 through every flex/grid parent.
+    */
     @media (max-height: 800px) {
       .workspace { grid-template-rows: auto minmax(210px, 40vh) minmax(0, 1fr); }
       .bottom-row { grid-template-columns: minmax(220px, 280px) minmax(330px, 1fr) minmax(240px, 300px); }
@@ -975,6 +982,225 @@
       font-size: 0.6rem;
       color: var(--muted);
       line-height: 1.2;
+    }
+    @media (max-height: 900px) {
+      .workspace {
+        grid-template-rows: auto minmax(190px, 34vh) minmax(260px, 1fr);
+        padding: 10px 10px 70px;
+        gap: 10px;
+      }
+      .video-row,
+      .bottom-row {
+        gap: 10px;
+      }
+      .video-box {
+        min-height: 190px;
+      }
+      .card {
+        padding: 9px;
+      }
+      .card-title {
+        margin-bottom: 7px;
+      }
+      .identity-grid {
+        max-height: 128px;
+      }
+      .identity-slot {
+        height: 62px;
+      }
+      .slot-upload {
+        max-height: 112px;
+      }
+      .workspace-tabs {
+        margin-bottom: 6px;
+      }
+      .workspace-tab {
+        padding: 5px 4px;
+        font-size: 0.65rem;
+      }
+      .scene-grid-scroll {
+        flex-basis: clamp(138px, 20vh, 210px);
+        min-height: 128px;
+        max-height: clamp(138px, 20vh, 210px);
+      }
+    }
+    @media (max-height: 780px) {
+      html, body {
+        font-size: 12px;
+      }
+      header {
+        height: 42px;
+        padding: 0 12px;
+        gap: 7px;
+      }
+      .drag-region {
+        height: 42px;
+      }
+      .app-logo {
+        height: 24px;
+        width: 24px;
+      }
+      .logo-tz,
+      .logo-urah {
+        font-size: 16px;
+      }
+      .logo-live {
+        font-size: 8px;
+        letter-spacing: 2px;
+      }
+      .header-right {
+        gap: 5px;
+      }
+      .header-right button {
+        padding: 3px 7px;
+        font-size: 0.66rem;
+      }
+      .theme-toggle button {
+        padding: 2px 6px;
+      }
+      .workspace {
+        grid-template-rows: auto minmax(168px, 26vh) minmax(278px, 1fr);
+        padding: 8px 10px 64px;
+        gap: 8px;
+      }
+      .camera-bar {
+        padding: 4px 8px;
+        gap: 6px;
+        font-size: 0.66rem;
+      }
+      #camera-bar {
+        gap: 4px !important;
+      }
+      .stats-bar {
+        height: 28px;
+        font-size: 0.66rem;
+      }
+      .stat {
+        padding: 0 9px;
+        gap: 5px;
+      }
+      .video-row,
+      .bottom-row {
+        gap: 8px;
+      }
+      .video-box {
+        min-height: 168px;
+      }
+      .video-ph {
+        gap: 5px;
+        font-size: 0.68rem;
+      }
+      .identity-grid {
+        max-height: 104px;
+        gap: 5px;
+        margin-bottom: 6px;
+      }
+      .identity-slot {
+        height: 50px;
+      }
+      .identity-add-btn {
+        padding: 4px 8px;
+        margin-bottom: 5px;
+      }
+      .identity-divider {
+        margin: 4px 0;
+      }
+      .slot-upload {
+        min-height: 48px;
+        max-height: 86px;
+        margin-bottom: 4px;
+      }
+      .slot-name-row {
+        margin-top: 3px;
+      }
+      .prompt-card {
+        padding: 8px;
+      }
+      .prompt-mode-body,
+      .prompt-mode-scroll[data-panel="scenes"],
+      .scene-panel {
+        min-height: 0;
+      }
+      .scene-title {
+        margin-bottom: 1px;
+      }
+      .scene-state {
+        font-size: 0.66rem;
+        line-height: 1.2;
+      }
+      .scene-toolbar {
+        gap: 5px;
+      }
+      .scene-search {
+        height: 24px;
+        font-size: 0.64rem;
+      }
+      .scene-filter-row {
+        gap: 4px;
+        padding-bottom: 1px;
+      }
+      .scene-filter-btn {
+        padding: 3px 7px;
+        font-size: 0.58rem;
+      }
+      .scene-preset-grid {
+        grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+        gap: 5px;
+      }
+      .scene-grid-scroll {
+        flex-basis: clamp(132px, 20vh, 172px);
+        min-height: 120px;
+        max-height: clamp(132px, 20vh, 172px);
+        padding-right: 5px;
+      }
+      .scene-card {
+        min-height: 34px;
+        padding: 5px 6px;
+      }
+      .scene-card::before {
+        left: 6px;
+        top: 6px;
+        width: 4px;
+        height: 4px;
+      }
+      .scene-card-name {
+        font-size: 0.66rem;
+        line-height: 1.15;
+        margin-bottom: 0;
+        padding-left: 8px;
+      }
+      .scene-card-meta {
+        font-size: 0.56rem;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .scene-actions {
+        gap: 4px;
+      }
+      .scene-status {
+        font-size: 0.6rem;
+        line-height: 1.18;
+      }
+      .action-bar {
+        min-height: 56px;
+        padding: 8px 12px;
+      }
+      .action-bar-inner {
+        gap: 6px;
+      }
+      .action-bar .btn {
+        min-width: 92px;
+        padding: 7px 12px;
+      }
+    }
+    @media (min-height: 901px) {
+      .scene-grid-scroll {
+        flex-basis: clamp(180px, 24vh, 290px);
+        min-height: 160px;
+        max-height: clamp(180px, 24vh, 290px);
+      }
     }
     .scene-actions {
       display: flex;
