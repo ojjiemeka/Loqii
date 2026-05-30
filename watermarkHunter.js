@@ -3,7 +3,7 @@
 //
 // Stage 1 — Sobel edge detection on half-res (640×360) frame
 // Stage 2 — Candidate scoring: edge density, color variance, aspect ratio
-// Stage 3 — Temporal tracking: 3-frame confirmation, jump detection, miss tolerance
+// Stage 3 — Temporal tracking: 1-frame confirmation, jump detection, miss tolerance
 // Stage 4 — Adaptive inpainting: 4-border blend + edge feathering
 //
 // Exports the same public API as watermarkRemover.js so index.html
@@ -17,9 +17,9 @@ const BADGE_MIN_HEIGHT = 20;
 const BADGE_MAX_HEIGHT = 42;
 const BADGE_MIN_ASPECT = 2.5;
 const BADGE_MAX_ASPECT = 8.0;
-const CONFIRM_FRAMES   = 3;
-const MISS_TOLERANCE   = 15;
-const JUMP_THRESHOLD   = 80;
+const CONFIRM_FRAMES   = 1;
+const MISS_TOLERANCE   = 8;
+const JUMP_THRESHOLD   = 50;
 const SCORE_THRESHOLD  = 55;
 const EDGE_THRESH      = 22;   // Sobel magnitude for an "edge" pixel
 const INPAINT_SAMP     = 12;   // px strip sampled on each side for inpainting
@@ -57,6 +57,8 @@ let _candidateBox   = null;
 let _candidateCount = 0;
 let _missCount      = 0;
 let _lastScore      = 0;
+let _lastJumpFrame  = 0;
+let _lastJumpTime   = 0;
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -159,6 +161,7 @@ export function destroyWatermarkRemover() {
   _confirmedBox = null; _confirmedAt = 0;
   _candidateBox = null; _candidateCount = 0;
   _missCount = 0; _lastScore = 0;
+  _lastJumpFrame = 0; _lastJumpTime = 0;
   if (was) console.log('[HUNTER] Destroyed');
 }
 
@@ -312,8 +315,8 @@ function scoreCandidate(hbox, data, edges, W, H) {
 // ─── Stage 3: temporal tracking ───────────────────────────────────────────────
 //
 // Called once per frame (except when stably confirmed on even frames).
-// Builds up CONFIRM_FRAMES consecutive detections before accepting a position.
-// Detects jumps > JUMP_THRESHOLD px and resets confirmation.
+// Confirms a candidate after CONFIRM_FRAMES=1 detection (immediate).
+// Detects jumps > JUMP_THRESHOLD px and confirms new position immediately.
 // Clears tracking after MISS_TOLERANCE consecutive missed frames.
 
 function detectAndTrack() {
@@ -340,6 +343,11 @@ function detectAndTrack() {
   if (_confirmedBox) {
     const d = centroidDist(_confirmedBox, candidate);
     if (d > JUMP_THRESHOLD) {
+      const now           = performance.now();
+      const intervalMs    = _lastJumpTime > 0 ? Math.round(now - _lastJumpTime) : 0;
+      const intervalFrames = _frameCount - _lastJumpFrame;
+      _lastJumpTime  = now;
+      _lastJumpFrame = _frameCount;
       console.log(
         '[HUNTER] Jump detected:',
         `(${(_confirmedBox.x + _confirmedBox.w / 2) | 0},` +
@@ -349,7 +357,14 @@ function detectAndTrack() {
         `${(candidate.y + candidate.h / 2) | 0})`,
         `distance=${Math.round(d)}px`
       );
-      _confirmedBox = null; _candidateBox = candidate; _candidateCount = 1;
+      if (_lastJumpTime > 0 && intervalMs > 0) {
+        console.log(`[HUNTER] Jump interval: ${intervalMs}ms (${intervalFrames} frames since last jump)`);
+      }
+      // Confirm new position immediately — no 3-frame queue after a jump
+      _confirmedBox   = { ...candidate };
+      _confirmedAt    = _frameCount;
+      _candidateBox   = null;
+      _candidateCount = 0;
       return;
     }
     // Smooth-update confirmed position with low momentum (prevents drift)
