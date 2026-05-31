@@ -130,6 +130,13 @@ contextBridge.exposeInMainWorld("tzurah", {
   devBypass: () =>
     ipcRenderer.invoke("auth:devBypass"),
 
+  // ── Watermark removal ───────────────────────────────────────────
+
+  /** Send a raw 1280×720 RGBA ArrayBuffer to the main process for Sharp-based
+   *  watermark detection + inpainting. Returns the cleaned RGBA buffer. */
+  processWatermarkFrame: (rgbaBuffer) =>
+    ipcRenderer.invoke("watermark:process", rgbaBuffer),
+
   // ── Event subscriptions ─────────────────────────────────────────
 
   /**

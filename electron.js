@@ -28,6 +28,7 @@ let autoUpdater       = null;
 //  Local modules 
 const db       = require("./db.js");
 const supabase = require("./supabase.js");
+const { processFrame: sharpProcessFrame } = require("./watermarkSharp");
 
 // Reduce non-fatal Chromium/WebRTC DNS noise without suppressing app console logs.
 app.commandLine.appendSwitch("log-level", "2");
@@ -1214,6 +1215,16 @@ ipcMain.handle("auth:devBypass", () => {
   db.seedDevSession();
   showMainApp();
   return { ok: true };
+});
+
+//  Watermark removal
+ipcMain.handle("watermark:process", async (_e, rgbaBuffer) => {
+  try {
+    return await sharpProcessFrame(Buffer.from(rgbaBuffer));
+  } catch (err) {
+    console.error("[WATERMARK IPC] Error:", err.message);
+    return rgbaBuffer;
+  }
 });
 
 //  Auto-updater 
