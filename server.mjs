@@ -390,6 +390,65 @@ function handleOAuthBrowserCallback(req, res) {
     .send(oauthCallbackPage(payload));
 }
 
+function safeBodyKeys(body) {
+  return body && typeof body === "object" && !Array.isArray(body) ? Object.keys(body) : [];
+}
+
+async function proxyBackendJson(req, res, backendPath, { timeoutMs = 8000 } = {}) {
+  const gcpUrl = (appConfig?.gcp_server_url) || GCP_URL;
+  const authHeader = req.headers.authorization || "";
+  const method = String(req.method || "GET").toUpperCase();
+  const route = req.path || backendPath;
+  const headers = {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  };
+  if (authHeader) headers.Authorization = authHeader;
+  const init = {
+    method,
+    headers,
+    signal: AbortSignal.timeout(timeoutMs),
+  };
+  if (!["GET", "HEAD"].includes(method)) {
+    init.body = JSON.stringify(req.body || {});
+  }
+
+  console.log("[PROXY] request", {
+    route,
+    method,
+    auth_present: String(authHeader).startsWith("Bearer "),
+    body_keys: safeBodyKeys(req.body),
+  });
+
+  try {
+    const backendRes = await fetch(`${gcpUrl}${backendPath}`, init);
+    const raw = await backendRes.text();
+    let data = {};
+    if (raw) {
+      try { data = JSON.parse(raw); }
+      catch { data = { ok: backendRes.ok, message: raw.slice(0, 500) }; }
+    }
+    console.log("[PROXY] response", {
+      route,
+      status: backendRes.status,
+      ok: backendRes.ok,
+      reason: data?.reason || data?.error || data?.message || null,
+    });
+    return res.status(backendRes.status).json(data);
+  } catch (err) {
+    console.warn("[PROXY] failure", {
+      route,
+      method,
+      reason: err?.name || err?.message || "fetch_error",
+    });
+    return res.status(503).json({
+      ok: false,
+      error: "Service temporarily unavailable",
+      reason: err?.name === "TimeoutError" ? "backend_timeout" : "backend_unavailable",
+    });
+  }
+}
+
 async function fetchBootstrap() {
   const endpoint = "/api/bootstrap";
   const url = `${GCP_URL}${endpoint}`;
@@ -572,7 +631,11 @@ function buildApp() {
   }
 
   app.get("/api/token", handleTokenRequest);
+  app.post("/api/token", handleTokenRequest);
   app.get("/api/key",   handleTokenRequest);
+  app.post("/api/key",  handleTokenRequest);
+  app.get("/api/decart/client-token", handleTokenRequest);
+  app.post("/api/decart/client-token", handleTokenRequest);
 
   // /decart/token - proxies user-authed client-token request to GCP
   // Requires Authorization: Bearer <supabase-access-token> from the renderer.
@@ -725,6 +788,34 @@ function buildApp() {
         environment: isDevelopment() ? "development_degraded" : "bootstrap_fallback",
       });
     }
+  });
+
+  app.post("/api/ensure-profile", (req, res) => {
+    return proxyBackendJson(req, res, "/api/ensure-profile");
+  });
+
+  app.get("/api/announcements", (req, res) => {
+    return proxyBackendJson(req, res, "/api/announcements", { timeoutMs: 5000 });
+  });
+
+  app.get("/api/credit-packs", (req, res) => {
+    return proxyBackendJson(req, res, "/api/credit-packs", { timeoutMs: 5000 });
+  });
+
+  app.get("/api/feature-flags", (req, res) => {
+    return proxyBackendJson(req, res, "/api/feature-flags", { timeoutMs: 5000 });
+  });
+
+  app.post("/session/end", (req, res) => {
+    return proxyBackendJson(req, res, "/session/end");
+  });
+
+  app.post("/credits/deduct", (req, res) => {
+    return proxyBackendJson(req, res, "/credits/deduct");
+  });
+
+  app.post("/credits/sync", (req, res) => {
+    return proxyBackendJson(req, res, "/credits/sync");
   });
 
   app.post("/mock/purchase", async (req, res) => {

@@ -2290,6 +2290,96 @@ const speakerSelect   = document.getElementById("speaker-select");
 
 //  GCP Server URL (overridden by bootstrap config) 
 let GCP_SERVER_URL = "";
+let APP_ENVIRONMENT_LABEL = "development";
+const LOCAL_APP_ORIGIN = "http://localhost:3000";
+const APP_OWNED_PROXY_PATHS = [
+  "/api/ensure-profile",
+  "/api/announcements",
+  "/session/ping",
+  "/session/end",
+  "/credits/deduct",
+  "/credits/sync",
+  "/api/token",
+  "/api/key",
+  "/decart/token",
+  "/api/decart/client-token",
+  "/api/app-config",
+  "/api/config",
+  "/api/credit-packs",
+  "/api/feature-flags",
+];
+
+function isAppOwnedProxyPath(pathname = "") {
+  return APP_OWNED_PROXY_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+function appApiUrl(path) {
+  const raw = String(path || "");
+  if (/^https?:\/\//i.test(raw)) {
+    const url = new URL(raw);
+    return isElectron && isAppOwnedProxyPath(url.pathname)
+      ? `${LOCAL_APP_ORIGIN}${url.pathname}${url.search}`
+      : raw;
+  }
+  const normalized = raw.startsWith("/") ? raw : `/${raw}`;
+  return isElectron ? `${LOCAL_APP_ORIGIN}${normalized}` : normalized;
+}
+
+async function appApi(path, options = {}) {
+  const {
+    json,
+    auth = false,
+    timeoutMs = 10000,
+    headers: inputHeaders = {},
+    ...fetchOptions
+  } = options;
+  const headers = { ...inputHeaders };
+  let body = fetchOptions.body;
+  if (json !== undefined) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+    body = JSON.stringify(json);
+  }
+  if (auth && !headers.Authorization && window.tzurah?.getAccessToken) {
+    const accessToken = await window.tzurah.getAccessToken().catch(() => null);
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    return await fetch(appApiUrl(path), {
+      ...fetchOptions,
+      headers,
+      body,
+      signal: fetchOptions.signal || controller?.signal,
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function installDirectBackendFetchGuard() {
+  if (!isElectron || window.__loqiiFetchGuardInstalled) return;
+  if (!String(APP_ENVIRONMENT_LABEL || "").startsWith("development")) return;
+  window.__loqiiFetchGuardInstalled = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    try {
+      const raw = typeof input === "string" ? input : input?.url;
+      if (raw && /^https?:\/\//i.test(raw) && GCP_SERVER_URL) {
+        const url = new URL(raw);
+        const backend = new URL(GCP_SERVER_URL);
+        if (url.origin === backend.origin && isAppOwnedProxyPath(url.pathname)) {
+          const nextUrl = `${LOCAL_APP_ORIGIN}${url.pathname}${url.search}`;
+          console.warn("[API ROUTING WARNING] Direct backend call detected. Use local proxy.", {
+            path: url.pathname,
+          });
+          if (typeof input === "string") return originalFetch(nextUrl, init);
+        }
+      }
+    } catch (_) {}
+    return originalFetch(input, init);
+  };
+}
 
 //  Bootstrap config defaults (overridden after bootstrapApp()) 
 window._featureFlags = {};
@@ -2414,7 +2504,7 @@ async function refreshFeatureFlags() {
     if (window.tzurah?.getAccessToken) accessToken = await window.tzurah.getAccessToken().catch(() => null);
     const headers = { "Cache-Control": "no-store" };
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    const res = await fetch("http://localhost:3000/api/app-config", { cache: "no-store", headers });
+    const res = await appApi("/api/app-config", { cache: "no-store", headers });
     if (!res.ok) throw new Error(`app-config ${res.status}`);
     const data = await res.json();
     const nextFlags = data.app_flags || data.feature_flags || {};
@@ -2539,7 +2629,7 @@ async function bootstrapApp() {
   let config = null;
   for (let i = 0; i < 5; i++) {
     try {
-      const res = await fetch('http://localhost:3000/api/config');
+      const res = await appApi("/api/config");
       if (res.ok) { config = await res.json(); break; }
     } catch (_) {}
     await new Promise(r => setTimeout(r, 1000));
@@ -2551,6 +2641,8 @@ async function bootstrapApp() {
   }
   // Apply config
   GCP_SERVER_URL            = config.gcp_server_url;
+  APP_ENVIRONMENT_LABEL     = config.environment_label || config.environment || "development";
+  installDirectBackendFetchGuard();
   if (config.degraded === true) {
     markConfigDegraded(config.degraded_reason || "Backend config unavailable");
     console.warn("[BOOTSTRAP] Backend config unavailable; using local development defaults.");
@@ -2578,15 +2670,14 @@ if (!ok) return; // error overlay shown - do nothing further
   // Silently ensure profile exists (belt-and-suspenders for Google OAuth users)
   window.tzurah.getSession().then(session => {
     if (!session?.user_id || !session?.email) return;
-    fetch(`${GCP_SERVER_URL}/api/ensure-profile`, {
+    appApi("/api/ensure-profile", {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      json: {
         user_id:    session.user_id,
         email:      session.email,
         full_name:  session.display_name || null,
         avatar_url: session.avatar_url   || null,
-      }),
+      },
     }).catch(e => console.warn("[PROFILE] ensure-profile failed:", e.message));
     refreshFeatureFlags().then(applyFeatureFlags).catch(() => {});
   }).catch(() => {});
@@ -2667,7 +2758,6 @@ async function startSessionPing() {
 }
 
 async function sendSessionPing(session, creditsUsed, options = {}) {
-  const endpoint = isElectron ? "http://localhost:3000/session/ping" : `${GCP_SERVER_URL}/session/ping`;
   const accessToken = options.accessToken || await window.tzurah?.getAccessToken?.().catch(() => null);
   const headers = { "Content-Type": "application/json" };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -2686,10 +2776,10 @@ async function sendSessionPing(session, creditsUsed, options = {}) {
     reconnect_state: reconnectManager.getSnapshot?.() || null,
   });
   try {
-    const res = await fetch(endpoint, {
+    const res = await appApi("/session/ping", {
       method:  "POST",
       headers,
-      body:    JSON.stringify(body),
+      json:    body,
     });
     const data = await res.json().catch(() => ({}));
     console.log("[SESSION REGISTER] response", {
@@ -2759,7 +2849,7 @@ async function registerAuthoritativeBillingSession(session) {
     }
   } catch (_) {}
   console.log("[SESSION REGISTER] request", {
-    endpoint: isElectron ? "http://localhost:3000/session/ping" : `${GCP_SERVER_URL}/session/ping`,
+    endpoint: appApiUrl("/session/ping"),
     user_id: session.user_id,
     email: session.email || null,
     session_id: currentSessionId,
@@ -2879,10 +2969,9 @@ async function endSessionPing() {
   if (!session) return { ok: false, skipped: true, reason: "missing_session" };
   console.log("[PING] end ->", session.user_id);
   try {
-    const res = await fetch(`${GCP_SERVER_URL}/session/end`, {
+    const res = await appApi("/session/end", {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ user_id: session.user_id, session_id: currentSessionId }),
+      json:    { user_id: session.user_id, session_id: currentSessionId },
     });
     return { ok: res.ok, status: res.status };
   } catch (err) {
@@ -4012,7 +4101,7 @@ async function loadCreditPacksForModal() {
   let packs = (window._creditPacks || []).filter(p => p.is_active !== false);
   if (!packs.length) {
     try {
-      const data = await fetch(`${GCP_SERVER_URL}/api/credit-packs`).then(r => r.json());
+      const data = await appApi("/api/credit-packs").then(r => r.json());
       packs = (data?.packs || data || []).filter(p => p.is_active !== false);
     } catch (e) {
       console.error("[ADD CREDITS] Failed to load packs:", e);
@@ -4590,6 +4679,9 @@ async function doStop(options = {}) {
   if (snapDuration > 0) {
     const pingEndResult = await endSessionPing();
     console.log("[STOP] session end result", pingEndResult);
+    if (pingEndResult && pingEndResult.ok === false && !pingEndResult.skipped) {
+      log("Session ended locally, but server finalization could not be confirmed.", "warning");
+    }
   } else {
     if (sessionPingInterval) { clearInterval(sessionPingInterval); sessionPingInterval = null; }
   }
@@ -4644,7 +4736,7 @@ async function getAPIToken() {
 
       if (!accessToken) throw new Error("No access token  please log in again");
 
-      const res = await fetch(`http://localhost:3000/decart/token?ts=${Date.now()}`, {
+      const res = await appApi(`/decart/token?ts=${Date.now()}`, {
         cache: "no-store",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
@@ -5136,7 +5228,7 @@ window.addEventListener("beforeunload", () => {
     if (isConnected && currentUserId) {
       try {
         navigator.sendBeacon(
-          `${GCP_SERVER_URL}/session/end`,
+          appApiUrl("/session/end"),
           new Blob([JSON.stringify({ user_id: currentUserId, session_id: currentSessionId })], { type: "application/json" })
         );
       } catch (_) {}
@@ -6102,7 +6194,7 @@ async function loadFeatureFlags() {
       return;
     }
     // Fallback: direct GCP fetch (non-Electron or bootstrap not yet complete)
-    const res = await fetch(`${GCP_SERVER_URL}/api/feature-flags`);
+    const res = await appApi("/api/feature-flags");
     if (res.ok) {
       const data = await res.json();
       featureFlags = data;
@@ -6150,7 +6242,7 @@ function isAnnouncementDismissed(ann) {
 
 window.checkAnnouncements = async function checkAnnouncements() {
   try {
-    const res = await fetch(`${GCP_SERVER_URL}/api/announcements`);
+    const res = await appApi("/api/announcements");
     if (!res.ok) return;
     const { announcements } = await res.json();
     renderAnnouncementsPanel(announcements || []);
