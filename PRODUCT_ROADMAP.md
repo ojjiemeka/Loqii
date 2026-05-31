@@ -81,6 +81,10 @@ Phase 8C control-plane update:
 - Verify onboarding can be disabled/enabled for dev accounts from admin.
 - Package test build and validate no `.env` or service credentials are included.
 
+Beta QA checklist:
+- `BETA_QA_CHECKLIST.md` is the repeatable pass/fail checklist for app boot, auth, runtime, billing/session, feature flags, responsive UI, local proxy routing, admin/backend, failure cases, and release readiness.
+- Specialized app overlays are expected to use LoqiiModal/LoqiiDrawer/LoqiiToast before beta packaging.
+
 ## Production Blockers
 
 - Code signing for Windows installer.

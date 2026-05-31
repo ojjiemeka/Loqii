@@ -173,6 +173,8 @@ Future option:
 
 ## Preconditions Before Shipping `.exe`
 
+- Complete `BETA_QA_CHECKLIST.md` for the exact commit being packaged.
+- Verify specialized modal surfaces use LoqiiModal/LoqiiDrawer/LoqiiToast and are readable in light and dark mode.
 - App login, credits, Decart token, and start/stop lifecycle verified.
 - Packaged app refuses to boot without production `GCP_SERVER_URL`, `INTERNAL_SECRET`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`; `BOOTSTRAP_SECRET` is required whenever privileged bootstrap is enabled for the release.
 - Public pre-login config is served by `/api/public-config` and verified to expose only Supabase URL, anon key, app metadata, public flags, and auth provider availability.

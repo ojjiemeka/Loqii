@@ -186,10 +186,72 @@ function injectModalStyles() {
       display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px;
     }
     .loqii-credit-actions .loqii-btn { min-width: 132px; }
+    .loqii-summary-panel,
+    .loqii-obs-panel,
+    .loqii-florence-panel {
+      display: flex; flex-direction: column; gap: 12px; color: var(--text-primary);
+    }
+    .loqii-summary-stats {
+      border: 1px solid var(--border); border-radius: 9px; overflow: hidden;
+      background: var(--surface-elevated);
+    }
+    .loqii-summary-row {
+      display: flex; justify-content: space-between; gap: 14px;
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+    }
+    .loqii-summary-row:last-child { border-bottom: 0; }
+    .loqii-summary-label {
+      color: var(--text-secondary); font-size: .74rem; font-weight: 800;
+    }
+    .loqii-summary-value {
+      color: var(--text-primary); font-size: .78rem; font-weight: 900; text-align: right;
+    }
+    .loqii-summary-value.green { color: var(--accent-primary); }
+    .loqii-summary-value.orange,
+    .loqii-summary-value.red { color: var(--accent-danger); }
+    .loqii-summary-warning {
+      padding: 10px 12px; border: 1px solid var(--accent-danger); border-radius: 9px;
+      background: var(--surface-elevated); color: var(--text-primary);
+      font-size: .78rem; font-weight: 800; line-height: 1.4;
+    }
+    .loqii-summary-note,
+    .loqii-obs-note {
+      color: var(--text-secondary); font-size: .76rem; line-height: 1.5;
+    }
+    .loqii-summary-actions,
+    .loqii-obs-actions {
+      display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px;
+    }
+    .loqii-obs-steps { display: flex; flex-direction: column; gap: 9px; }
+    .loqii-obs-step {
+      display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px; align-items: start;
+      padding: 10px; border: 1px solid var(--border); border-radius: 9px;
+      background: var(--surface-elevated); color: var(--text-secondary); font-size: .78rem; line-height: 1.45;
+    }
+    .loqii-step-num {
+      width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+      background: var(--accent-primary); color: var(--loqii-paper); font-size: .7rem; font-weight: 900;
+    }
+    .loqii-url-row {
+      margin-top: 6px; display: flex; gap: 7px; align-items: center;
+    }
+    .loqii-url-row code {
+      flex: 1 1 auto; min-width: 0; padding: 7px 8px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-primary);
+      overflow-wrap: anywhere; font-size: .72rem;
+    }
+    .loqii-checkbox-row {
+      display: flex; gap: 8px; align-items: center; color: var(--text-secondary);
+      font-size: .76rem; font-weight: 750;
+    }
     @media (max-width: 620px) {
       .loqii-credit-grid { grid-template-columns: 1fr; }
       .loqii-credit-actions { flex-direction: column-reverse; }
       .loqii-credit-actions .loqii-btn { width: 100%; }
+      .loqii-summary-actions,
+      .loqii-obs-actions { flex-direction: column-reverse; }
+      .loqii-summary-actions .loqii-btn,
+      .loqii-obs-actions .loqii-btn { width: 100%; }
     }
     @keyframes loqiiSpin { to { transform: rotate(360deg); } }
   `;
@@ -222,6 +284,8 @@ export function LoqiiModal(options = {}) {
     closeOnBackdrop,
     closeOnEscape,
     showCloseButton,
+    onMount,
+    onClose,
   } = options;
   const allowBackdropClose = closeOnBackdrop ?? (!persistent && cancelable);
   const allowEscapeClose = closeOnEscape ?? (!persistent && cancelable);
@@ -229,6 +293,7 @@ export function LoqiiModal(options = {}) {
 
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
+    let closed = false;
     overlay.className = "loqii-overlay";
     applyThemeToOverlayRoot(overlay);
     overlay.setAttribute("role", "dialog");
@@ -251,10 +316,20 @@ export function LoqiiModal(options = {}) {
     document.body.appendChild(overlay);
 
     const finish = (confirmed) => {
+      if (closed) return;
+      closed = true;
       const value = input && confirmed ? overlay.querySelector("[data-loqii-input]")?.value || "" : null;
       overlay.remove();
+      if (typeof onClose === "function") onClose(confirmed);
       resolve(input ? (confirmed ? value : null) : confirmed);
     };
+    if (typeof onMount === "function") {
+      onMount({
+        overlay,
+        close: () => finish(false),
+        confirm: () => finish(true),
+      });
+    }
     const onKey = (event) => {
       if (!document.body.contains(overlay)) return document.removeEventListener("keydown", onKey);
       if (event.key === "Escape" && allowEscapeClose) finish(false);

@@ -1403,156 +1403,6 @@
       pointer-events: none; user-select: none;
     }
 
-    /*  Session Summary Modal  */
-    .summary-overlay {
-      position: fixed; inset: 0;
-      background: rgba(1,22,39,0.72);
-      backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 9999;
-      animation: summaryFadeIn 0.25s ease;
-    }
-    @keyframes summaryFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    .summary-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 28px 28px 22px;
-      min-width: 340px; max-width: 400px; width: 100%;
-      display: flex; flex-direction: column; gap: 18px;
-    }
-    .summary-title {
-      font-size: 1rem; font-weight: 800; letter-spacing: -0.02em;
-      color: var(--text); text-align: center;
-    }
-    .summary-stats {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; overflow: hidden;
-    }
-    .summary-stat-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 14px; border-bottom: 1px solid var(--border); gap: 12px;
-    }
-    .summary-stat-row:last-child { border-bottom: none; }
-    .summary-stat-label { font-size: 0.8rem; color: var(--muted); }
-    .summary-stat-value {
-      font-size: 0.82rem; font-weight: 700;
-      color: var(--text); font-variant-numeric: tabular-nums;
-    }
-    .summary-stat-value.green  { color: var(--green); }
-    .summary-stat-value.orange { color: var(--orange); }
-    .summary-stat-value.red    { color: var(--red); }
-    .summary-low-warning {
-      display: flex; align-items: center; gap: 7px;
-      padding: 8px 12px; border-radius: 6px;
-      background: rgba(201,112,100,.08); border: 1px solid rgba(201,112,100,.25);
-      color: var(--orange); font-size: 0.78rem; font-weight: 600;
-    }
-    .summary-actions { display: flex; gap: 10px; }
-    .summary-btn-topup {
-      flex: 1; padding: 9px;
-      font-size: 0.82rem; font-weight: 700; font-family: inherit;
-      border: none; border-radius: 7px;
-      background: linear-gradient(135deg, var(--loqii-green), var(--loqii-muted));
-      color: #F7F3E3; cursor: pointer; transition: filter .15s;
-    }
-    .summary-btn-topup:hover { filter: brightness(1.1); }
-    .summary-btn-close {
-      padding: 9px 18px; font-size: 0.82rem; font-weight: 600; font-family: inherit;
-      background: var(--surface2); color: var(--muted);
-      border: 1px solid var(--border); border-radius: 7px;
-      cursor: pointer; transition: all .15s;
-    }
-    .summary-btn-close:hover { color: var(--text); border-color: var(--accent); }
-    .summary-autodismiss {
-      text-align: center; font-size: 0.68rem; color: var(--muted);
-      font-variant-numeric: tabular-nums;
-    }
-
-    /*  OBS Setup Modal  */
-    .obs-modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(1,22,39,.72); backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 9998; animation: summaryFadeIn .2s ease;
-    }
-    .obs-modal-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 24px; max-width: 440px; width: calc(100% - 32px);
-      display: flex; flex-direction: column; gap: 14px;
-      max-height: calc(100vh - 60px); overflow-y: auto;
-    }
-    .obs-modal-title {
-      font-size: 0.9rem; font-weight: 800; color: var(--text); display: flex; align-items: center; gap: 8px;
-    }
-    .obs-steps { display: flex; flex-direction: column; }
-    .obs-step {
-      display: flex; align-items: flex-start; gap: 12px;
-      padding: 8px 0; border-bottom: 1px solid rgba(247,243,227,0.06);
-      font-size: 0.8rem; color: var(--muted); line-height: 1.4;
-    }
-    .obs-step:last-child { border-bottom: none; }
-    .obs-step strong { color: var(--text); }
-    .obs-step-num {
-      flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
-      background: rgba(63,108,81,.2); color: var(--accent);
-      font-size: 0.7rem; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .step-num {
-      flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
-      background: #3F6C51; color: #F7F3E3; font-size: 11px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .obs-url-row {
-      display: flex; gap: 8px; align-items: center; margin-top: 6px;
-    }
-    .obs-url-row code {
-      background: rgba(247,243,227,0.08); padding: 4px 8px;
-      border-radius: 4px; font-size: 12px; color: #3F6C51;
-      font-family: "Consolas", monospace;
-    }
-    .obs-url-row .obs-copy-btn {
-      font-size: 11px; padding: 3px 8px; border-radius: 4px;
-      border: 1px solid #3F6C51; color: #3F6C51;
-      background: transparent; cursor: pointer; font-family: inherit;
-    }
-    .obs-url-row .obs-copy-btn:hover { background: rgba(63,108,81,0.15); }
-    .obs-divider {
-      border: none; border-top: 1px solid var(--border); margin: 4px 0;
-    }
-    .obs-alt-label {
-      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.07em; color: var(--muted); margin-bottom: 4px;
-    }
-    .obs-url-box {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; padding: 8px 12px;
-      font-family: "Consolas", monospace; font-size: 0.82rem; color: var(--loqii-green);
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    }
-    .obs-dont-show {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 0.74rem; color: var(--muted); cursor: pointer; user-select: none;
-    }
-    .obs-dont-show input { accent-color: var(--accent); cursor: pointer; }
-    .obs-modal-actions { display: flex; gap: 8px; align-items: center; }
-    .obs-modal-btn {
-      flex: 1; padding: 8px; font-size: 0.82rem; font-weight: 600; font-family: inherit;
-      border-radius: 7px; cursor: pointer; transition: all .15s;
-    }
-    .obs-modal-btn-primary {
-      background: linear-gradient(135deg, var(--loqii-green), #3F6C51);
-      border: none; color: #F7F3E3;
-    }
-    .obs-modal-btn-primary:hover { filter: brightness(1.1); }
-    .obs-modal-btn-secondary {
-      background: var(--surface2); color: var(--muted);
-      border: 1px solid var(--border);
-    }
-    .obs-modal-btn-secondary:hover { color: var(--text); }
-
     /*  FPS Counter  */
     .fps-counter {
       position: absolute; bottom: 8px; right: 8px;
@@ -2895,8 +2745,6 @@ const KILL_REASON_LABELS = {
 };
 
 function showAdminKillModal(reason, stats = {}) {
-  document.getElementById("admin-kill-modal")?.remove();
-
   const { snapDuration = 0, snapUsed = 0, snapLeft = 0 } = stats;
   const label    = reason ? (KILL_REASON_LABELS[reason] || reason) : null;
   const mins     = Math.floor(snapDuration / 60);
@@ -2904,62 +2752,34 @@ function showAdminKillModal(reason, stats = {}) {
   const duration = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   const timeLeft = creditsToTime(snapLeft);
 
-  const modal = document.createElement("div");
-  modal.id        = "admin-kill-modal";
-  modal.className = "summary-overlay";
-  modal.innerHTML = `
-    <div class="summary-card" style="max-width:420px">
-
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:1.2rem;margin-bottom:8px">Warning</div>
-        <div class="summary-title" style="color:#C97064">Session Ended by Admin</div>
-      </div>
-
-      <div style="padding:10px 14px;
-                  background:rgba(201,112,100,.08);
-                  border:1px solid rgba(201,112,100,.25);
-                  border-radius:8px;font-size:0.82rem;
-                  margin-bottom:16px;text-align:center">
-        <span style="color:#606D5D">Reason: </span>
-        <strong style="color:#C97064">${label || "Session ended by administrator"}</strong>
-      </div>
-
-      ${snapDuration > 0 ? `
-      <div class="summary-stats" style="margin-bottom:16px">
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Session Duration</span>
-          <span class="summary-stat-value">${duration}</span>
+  LoqiiModal({
+    title: "Session Ended by Admin",
+    className: "loqii-admin-kill-modal",
+    width: 440,
+    showFooter: false,
+    body: `
+      <div class="loqii-summary-panel" id="admin-kill-modal">
+        <div class="loqii-summary-warning">
+          Reason: <strong>${escapeHtml(label || "Session ended by administrator")}</strong>
         </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Credits used</span>
-          <span class="summary-stat-value">${parseFloat(snapUsed.toFixed(1))} cr</span>
+        ${snapDuration > 0 ? `
+        <div class="loqii-summary-stats">
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Session Duration</span><span class="loqii-summary-value">${duration}</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Credits used</span><span class="loqii-summary-value">${parseFloat(snapUsed.toFixed(1))} cr</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Credits remaining</span><span class="loqii-summary-value green">${parseFloat(Math.max(0, snapLeft).toFixed(1))} cr</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Time remaining</span><span class="loqii-summary-value green">${escapeHtml(timeLeft)}</span></div>
+        </div>` : ""}
+        <p class="loqii-summary-note">If you believe this is an error, contact <a href="mailto:support@tzurah.ai" style="color:var(--accent-primary)">support@tzurah.ai</a>.</p>
+        <div class="loqii-summary-actions">
+          <button class="loqii-btn loqii-btn-primary" type="button" id="kill-try-again-btn">Try Again</button>
+          <button class="loqii-btn" type="button" id="kill-dismiss-btn">Dismiss</button>
         </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Credits remaining</span>
-          <span class="summary-stat-value green">${parseFloat(Math.max(0, snapLeft).toFixed(1))} cr</span>
-        </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Time remaining</span>
-          <span class="summary-stat-value green">~ ${timeLeft}</span>
-        </div>
-      </div>` : ""}
-
-      <p style="font-size:0.78rem;color:#606D5D;text-align:center;margin-bottom:20px">
-        If you believe this is an error, contact
-        <a href="mailto:support@tzurah.ai" style="color:#3F6C51">support@tzurah.ai</a>
-      </p>
-
-      <div class="summary-actions">
-        <button class="summary-btn-topup" id="kill-try-again-btn">Try Again</button>
-        <button class="summary-btn-close"  id="kill-dismiss-btn">Dismiss</button>
-      </div>
-    </div>`;
-
-  document.body.appendChild(modal);
-
-  modal.querySelector("#kill-try-again-btn").addEventListener("click", () => modal.remove());
-  modal.querySelector("#kill-dismiss-btn").addEventListener("click",   () => modal.remove());
-  modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+      </div>`,
+    onMount: ({ overlay, close }) => {
+      overlay.querySelector("#kill-try-again-btn")?.addEventListener("click", close);
+      overlay.querySelector("#kill-dismiss-btn")?.addEventListener("click", close);
+    },
+  });
 }
 
 async function endSessionPing() {
@@ -4410,69 +4230,47 @@ function showSessionSummary(durationSec, creditsUsed, creditsLeft) {
   const lowCr   = left < 10;
   const leftCls = left <= 0 ? "red" : lowCr ? "orange" : "green";
 
-  document.getElementById("session-summary-modal")?.remove();
-
-  const modal = document.createElement("div");
-  modal.id        = "session-summary-modal";
-  modal.className = "summary-overlay";
-  modal.innerHTML = `
-    <div class="summary-card">
-      <div class="summary-title">Session Summary</div>
-      <div class="summary-stats">
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Duration</span>
-          <span class="summary-stat-value">${mmss}</span>
-        </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Credits used</span>
-          <span class="summary-stat-value">${used} cr</span>
-        </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Time used</span>
-          <span class="summary-stat-value">${creditsToTime(used)}</span>
-        </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Credits remaining</span>
-          <span class="summary-stat-value ${leftCls}">${left} cr</span>
-        </div>
-        <div class="summary-stat-row">
-          <span class="summary-stat-label">Time remaining</span>
-          <span class="summary-stat-value ${leftCls}"> ${creditsToTime(left)}</span>
-        </div>
-      </div>
-      ${lowCr ? `<div class="summary-low-warning"><span></span> Running low - consider adding credits</div>` : ""}
-      <div class="summary-actions">
-        ${isElectron ? `<button class="summary-btn-topup" id="summary-topup-btn">Add Credits</button>` : ""}
-        <button class="summary-btn-close" id="summary-close-btn">Close</button>
-      </div>
-      <div class="summary-autodismiss" id="summary-countdown">Auto-closing in 30s</div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  document.getElementById("summary-close-btn").addEventListener("click", closeSummary);
-  if (isElectron) {
-    document.getElementById("summary-topup-btn").addEventListener("click", () => {
-      openAddCreditsModal();
-      closeSummary();
-    });
-  }
-
-  modal.addEventListener("click", (e) => { if (e.target === modal) closeSummary(); });
-
   let remaining = 30;
-  const countdownEl = document.getElementById("summary-countdown");
-  const tick = setInterval(() => {
-    remaining--;
-    if (countdownEl) countdownEl.textContent = `Auto-closing in ${remaining}s`;
-    if (remaining <= 0) closeSummary();
-  }, 1000);
-
-  function closeSummary() {
-    clearInterval(tick);
-    document.getElementById("session-summary-modal")?.remove();
-  }
+  let tick = null;
+  LoqiiModal({
+    title: "Session Summary",
+    className: "loqii-session-summary-modal",
+    width: 440,
+    showFooter: false,
+    onClose: () => { if (tick) clearInterval(tick); },
+    body: `
+      <div class="loqii-summary-panel" id="session-summary-modal">
+        <div class="loqii-summary-stats">
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Duration</span><span class="loqii-summary-value">${mmss}</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Credits used</span><span class="loqii-summary-value">${used} cr</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Time used</span><span class="loqii-summary-value">${escapeHtml(creditsToTime(used))}</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Credits remaining</span><span class="loqii-summary-value ${leftCls}">${left} cr</span></div>
+          <div class="loqii-summary-row"><span class="loqii-summary-label">Time remaining</span><span class="loqii-summary-value ${leftCls}">${escapeHtml(creditsToTime(left))}</span></div>
+        </div>
+        ${lowCr ? `<div class="loqii-summary-warning">Running low. Consider adding credits before your next session.</div>` : ""}
+        <div class="loqii-summary-actions">
+          ${isElectron ? `<button class="loqii-btn loqii-btn-primary" type="button" id="summary-topup-btn">Add Credits</button>` : ""}
+          <button class="loqii-btn" type="button" id="summary-close-btn">Close</button>
+        </div>
+        <div class="loqii-summary-note" id="summary-countdown">Auto-closing in 30s</div>
+      </div>`,
+    onMount: ({ overlay, close }) => {
+      const closeSummary = () => {
+        close();
+      };
+      overlay.querySelector("#summary-close-btn")?.addEventListener("click", closeSummary);
+      overlay.querySelector("#summary-topup-btn")?.addEventListener("click", () => {
+        closeSummary();
+        openAddCreditsModal();
+      });
+      const countdownEl = overlay.querySelector("#summary-countdown");
+      tick = setInterval(() => {
+        remaining--;
+        if (countdownEl) countdownEl.textContent = `Auto-closing in ${remaining}s`;
+        if (remaining <= 0) closeSummary();
+      }, 1000);
+    },
+  });
 }
 
 //  OBS Setup Modal 
@@ -4501,73 +4299,48 @@ function showOBSSetupModal() {
 }
 
 function _renderOBSModal(obsUrl, onStart) {
-  document.getElementById("obs-setup-modal")?.remove();
-
-  const modal = document.createElement("div");
-  modal.id        = "obs-setup-modal";
-  modal.className = "obs-modal-overlay";
-  modal.innerHTML = `
-    <div class="obs-modal-card">
-      <div class="obs-modal-title"> OBS Setup</div>
-      <div class="obs-steps">
-        <div class="obs-step">
-          <span class="step-num">1</span>
-          <span>In OBS  Sources  click <strong>+</strong>  select <strong>Browser Source</strong></span>
+  LoqiiModal({
+    title: "OBS Setup",
+    className: "loqii-obs-setup-modal",
+    width: 560,
+    showFooter: false,
+    body: `
+      <div class="loqii-obs-panel" id="obs-setup-modal">
+        <div class="loqii-obs-steps">
+          <div class="loqii-obs-step"><span class="loqii-step-num">1</span><span>In OBS Sources, click <strong>+</strong> and select <strong>Browser Source</strong>.</span></div>
+          <div class="loqii-obs-step"><span class="loqii-step-num">2</span><span>Set URL to:<div class="loqii-url-row"><code id="obs-url-text">${escapeHtml(obsUrl)}</code><button class="loqii-btn" type="button" id="obs-copy-url">Copy</button></div></span></div>
+          <div class="loqii-obs-step"><span class="loqii-step-num">3</span><span>Set width to <strong>1280</strong> and height to <strong>720</strong>.</span></div>
+          <div class="loqii-obs-step"><span class="loqii-step-num">4</span><span>Check <strong>Shutdown source when not visible</strong>.</span></div>
+          <div class="loqii-obs-step"><span class="loqii-step-num">5</span><span>Click <strong>OK</strong>. Your transformed output appears without a browser bar.</span></div>
         </div>
-        <div class="obs-step">
-          <span class="step-num">2</span>
-          <span>Set URL to:
-            <div class="obs-url-row">
-              <code id="obs-url-text">${obsUrl}</code>
-              <button class="obs-copy-btn" id="obs-copy-url">Copy</button>
-            </div>
-          </span>
+        <label class="loqii-checkbox-row"><input type="checkbox" id="obs-dont-show-chk"> Don't show this again</label>
+        <div class="loqii-obs-actions">
+          <button class="loqii-btn loqii-btn-primary" type="button" id="obs-start-btn">Start Streaming</button>
+          <button class="loqii-btn" type="button" id="obs-close-btn">Got it</button>
         </div>
-        <div class="obs-step">
-          <span class="step-num">3</span>
-          <span>Width: <strong>1280</strong>  Height: <strong>720</strong></span>
-        </div>
-        <div class="obs-step">
-          <span class="step-num">4</span>
-          <span>Check <strong>"Shutdown source when not visible"</strong></span>
-        </div>
-        <div class="obs-step">
-          <span class="step-num">5</span>
-          <span>Click <strong>OK</strong>  your transformed face appears directly with no browser bar</span>
-        </div>
-      </div>
-      <hr class="obs-divider">
-      <label class="obs-dont-show">
-        <input type="checkbox" id="obs-dont-show-chk"> Don't show this again
-      </label>
-      <div class="obs-modal-actions">
-        <button class="obs-modal-btn obs-modal-btn-primary" id="obs-start-btn">Start Streaming</button>
-        <button class="obs-modal-btn obs-modal-btn-secondary" id="obs-close-btn">Got it</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  document.getElementById("obs-copy-url").addEventListener("click", function() {
-    navigator.clipboard.writeText(obsUrl).then(() => {
-      this.textContent = "Copied!";
-      setTimeout(() => { this.textContent = "Copy"; }, 1500);
-    }).catch(() => {});
+      </div>`,
+    onMount: ({ overlay, close }) => {
+      const saveSkip = () => {
+        const dontShow = overlay.querySelector("#obs-dont-show-chk")?.checked;
+        if (dontShow && isElectron) window.tzurah.setPreference("obs_skip_modal", true).catch(() => {});
+      };
+      overlay.querySelector("#obs-copy-url")?.addEventListener("click", function() {
+        navigator.clipboard.writeText(obsUrl).then(() => {
+          this.textContent = "Copied";
+          setTimeout(() => { this.textContent = "Copy"; }, 1500);
+        }).catch(() => {});
+      });
+      overlay.querySelector("#obs-start-btn")?.addEventListener("click", () => {
+        saveSkip();
+        close();
+        onStart();
+      });
+      overlay.querySelector("#obs-close-btn")?.addEventListener("click", () => {
+        saveSkip();
+        close();
+      });
+    },
   });
-
-  document.getElementById("obs-start-btn").addEventListener("click", () => {
-    const dontShow = document.getElementById("obs-dont-show-chk")?.checked;
-    if (dontShow && isElectron) window.tzurah.setPreference("obs_skip_modal", true).catch(() => {});
-    modal.remove();
-    onStart();
-  });
-
-  document.getElementById("obs-close-btn").addEventListener("click", () => {
-    const dontShow = document.getElementById("obs-dont-show-chk")?.checked;
-    if (dontShow && isElectron) window.tzurah.setPreference("obs_skip_modal", true).catch(() => {});
-    modal.remove();
-  });
-  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
 }
 
 //  Stop / cleanup 
@@ -5883,29 +5656,30 @@ function initFlorenceWorker() {
 }
 
 function showFlorenceDownloadModal(onConfirm) {
-  document.getElementById("florence-dl-modal")?.remove();
-  const modal = document.createElement("div");
-  modal.id = "florence-dl-modal";
-  modal.className = "obs-modal-overlay";
-  modal.innerHTML = `
-    <div class="obs-modal-card" style="max-width:380px">
-      <div class="obs-modal-title">Auto-describe</div>
-      <div style="font-size:0.82rem;color:var(--muted);line-height:1.65">
-        Auto-describe downloads the <strong style="color:var(--text)">Florence-2 AI model (~900 MB)</strong>
-        on first use and caches it permanently.<br><br>
-        This may take <strong style="color:var(--text)">5-15 minutes</strong> depending on your connection.
-        Download now?
-      </div>
-      <div class="obs-modal-actions">
-        <button class="obs-modal-btn obs-modal-btn-primary" id="fl-dl-confirm">Download &amp; Enable</button>
-        <button class="obs-modal-btn obs-modal-btn-secondary" id="fl-dl-cancel">Cancel</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  document.getElementById("fl-dl-confirm").addEventListener("click", () => { modal.remove(); onConfirm(); });
-  document.getElementById("fl-dl-cancel").addEventListener("click", () => modal.remove());
-  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+  LoqiiModal({
+    title: "Auto-describe",
+    className: "loqii-florence-modal",
+    width: 420,
+    showFooter: false,
+    body: `
+      <div class="loqii-florence-panel" id="florence-dl-modal">
+        <p class="loqii-summary-note">
+          Auto-describe downloads the <strong>Florence-2 AI model (~900 MB)</strong> on first use and caches it locally.
+          This may take <strong>5-15 minutes</strong> depending on your connection.
+        </p>
+        <div class="loqii-summary-actions">
+          <button class="loqii-btn loqii-btn-primary" type="button" id="fl-dl-confirm">Download &amp; Enable</button>
+          <button class="loqii-btn" type="button" id="fl-dl-cancel">Cancel</button>
+        </div>
+      </div>`,
+    onMount: ({ overlay, close }) => {
+      overlay.querySelector("#fl-dl-confirm")?.addEventListener("click", () => {
+        close();
+        onConfirm();
+      });
+      overlay.querySelector("#fl-dl-cancel")?.addEventListener("click", close);
+    },
+  });
 }
 
 btnAutoPrompt?.addEventListener("click", () => {

@@ -68,6 +68,7 @@ APP_SOURCE_FILES=(
   "RELEASE_PLAN.md"
   "PRODUCT_ROADMAP.md"
   "CHECKPOINT_RUNTIME_STABLE_2026_05_29.md"
+  "BETA_QA_CHECKLIST.md"
   "docs/screenshots/README.md"
   "docs/screenshots/workspace-light.png"
   "docs/screenshots/onboarding-light.png"
@@ -252,7 +253,7 @@ echo "Staged files:"
 echo "$STAGED_FILES" | sed 's/^/  - /'
 echo
 
-WHITELIST_PATTERN="^(\.gitignore|README\.md|AGENT\.md|BRAIN\.md|git-update-app\.sh|index\.html|electron\.js|preload\.js|server\.mjs|db\.js|supabase\.js|build\.js|sdk-entry\.js|sessionState\.js|sessionIndicators\.js|statusBanner\.js|promptComposer\.js|scenes\.js|styles\.js|performanceMonitor\.js|errorBoundary\.js|reconnectManager\.js|settingsArchitecture\.js|loqiiTheme\.js|loqiiModal\.js|loqiiDrawer\.js|loqiiToast\.js|loqiiHelp\.js|obs\.html|login\.html|signup\.html|topup\.html|dashboard\.html|package\.json|package-lock\.json|COMPONENTS\.md|RELEASE_PLAN\.md|PRODUCT_ROADMAP\.md|CHECKPOINT_RUNTIME_STABLE_2026_05_29\.md|docs/screenshots/(README\.md|workspace-light\.png|onboarding-light\.png|identity-slots-light\.png)|assets/(icon\.ico|tray-icon\.png|Tzurah_logo\.png))$"
+WHITELIST_PATTERN="^(\.gitignore|README\.md|AGENT\.md|BRAIN\.md|git-update-app\.sh|index\.html|electron\.js|preload\.js|server\.mjs|db\.js|supabase\.js|build\.js|sdk-entry\.js|sessionState\.js|sessionIndicators\.js|statusBanner\.js|promptComposer\.js|scenes\.js|styles\.js|performanceMonitor\.js|errorBoundary\.js|reconnectManager\.js|settingsArchitecture\.js|loqiiTheme\.js|loqiiModal\.js|loqiiDrawer\.js|loqiiToast\.js|loqiiHelp\.js|obs\.html|login\.html|signup\.html|topup\.html|dashboard\.html|package\.json|package-lock\.json|COMPONENTS\.md|RELEASE_PLAN\.md|PRODUCT_ROADMAP\.md|CHECKPOINT_RUNTIME_STABLE_2026_05_29\.md|BETA_QA_CHECKLIST\.md|docs/screenshots/(README\.md|workspace-light\.png|onboarding-light\.png|identity-slots-light\.png)|assets/(icon\.ico|tray-icon\.png|Tzurah_logo\.png))$"
 BAD_FILES=$(echo "$STAGED_FILES" | grep -Ev "$WHITELIST_PATTERN" || true)
 if [[ -n "$BAD_FILES" ]]; then
   echo "ERROR: Refusing to commit files outside the app source whitelist:"

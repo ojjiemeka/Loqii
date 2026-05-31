@@ -286,8 +286,9 @@ Permanent user/dev mode rules:
 Modal/drawer theme audit:
 - Migrated: unified Account drawer, unified Add Credits modal, Settings drawer, Help drawer, top-up fallback window, account dashboard fallback window, dashboard sign-out confirm, native camera/audio selects.
 - Already shared: keyboard shortcuts, onboarding, generic alerts/confirms/prompts, mock top-up flow.
-- Still legacy but reachable: session summary, admin kill summary, OBS setup, Florence download. These use Loqii palette variables but keep specialized fixed layouts.
+- Migrated in specialized cleanup: session summary, admin kill/session-ended summary, OBS setup, Florence download.
 - Conditional reachability: admin kill summary requires a server kill signal; Florence download requires the auto-describe flag.
+- Beta QA gate: `BETA_QA_CHECKLIST.md` owns the repeatable app/admin release readiness checklist before packaging.
 
 ## Server And API Modules
 
