@@ -1,68 +1,81 @@
-// watermarkHunter.js
-// Two-phase watermark removal via template matching.
+// watermarkHunter.js — DATA COLLECTION MODE
 //
-// Phase 1 — Auto-capture (first 60 frames)
-//   Fast brightness scan on a 64×36 downsampled canvas accumulates a heat map.
-//   The most consistent bright cluster matching badge dimensions is captured as
-//   a template (ImageData snapshot of that region in the live frame).
+// Detects watermark positions using the brightness-scan row-run approach
+// (the original method that consistently scored 67-95) and logs every
+// confirmed position to console + localStorage.
 //
-// Phase 2 — Template search (every frame after capture)
-//   4×4 grid MAD search finds the badge anywhere in the frame.
-//   A ±50px window search around the last confirmed position handles stable tracking
-//   and is 10× cheaper than the full grid search (used first each frame).
-//   Jump detection at 150px centroid distance updates the confirmed box immediately.
+// DATA_COLLECTION_MODE = true  → detect and log only, NO inpainting.
+//                              Run 5-10 sessions, then call:
+//                                console.table(window._getWatermarkPositions())
+//                              to see the full position map.
 //
-// Stage 4 — Adaptive inpainting (unchanged from edge-detection version)
-//   4-border bilinear blend + 2-pixel edge feather.
+// DATA_COLLECTION_MODE = false → inpainting enabled (for future hardcoded zones).
 //
-// Exports identical public API to watermarkRemover.js.
+// Public API identical to watermarkRemover.js.
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Mode flag ───────────────────────────────────────────────────────────────
 
-const CAPTURE_FRAMES         = 60;
-const CAPTURE_SCAN_STRIDE    = 20;   // tiny canvas cell size in source pixels
-const CAPTURE_BRIGHT_THRESH  = 180;
-const CAPTURE_MIN_FRAMES     = 20;   // hot cell threshold — appear in 20/60 frames
-const TEMPLATE_MAD_THRESHOLD = 30;   // confirmed match for window search
-const TEMPLATE_MAD_POSSIBLE  = 50;   // accepted match for full grid search
-const JUMP_THRESHOLD         = 150;
-const MISS_TOLERANCE         = 10;
-const SEARCH_STEP            = 3;    // pixel stride inside MAD comparisons
-const GRID_DIVISIONS         = 4;    // 4×4 = 16 grid search points
-const INPAINT_SAMP           = 12;
+const DATA_COLLECTION_MODE = true;
+
+// ─── Detection constants ──────────────────────────────────────────────────────
+
+const DETECT_STRIDE = 6;     // pixel stride for brightness scan
+const DETECT_THRESH = 185;   // R/G/B threshold — all channels must exceed this
+const DETECT_MIN_W  = 60;    // min badge width in px
+const DETECT_MAX_W  = 280;   // max badge width in px
+const DETECT_MAX_H  = 60;    // max badge height in px
+const DETECT_MIN_ASPECT = 1.5;
+
+// ─── Tracking constants ───────────────────────────────────────────────────────
+
+const CONFIRM_FRAMES  = 2;   // consecutive frames at same position before logging
+const MISS_TOLERANCE  = 8;   // frames without detection before clearing confirmed box
+const CONFIRM_DIST    = 15;  // px — candidate must stay within this to accumulate
+const LOG_MIN_DIST    = 20;  // px — log new entry only if centroid moved this far
+
+// ─── Inpainting constant (used when DATA_COLLECTION_MODE = false) ─────────────
+
+const INPAINT_SAMP = 12;
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
-// Template (Phase 1)
-let _template         = null;   // Uint8ClampedArray (RGBA) of captured region
-let _templateBox      = null;   // {x,y,w,h} — full-res coords of template
-let _templateCaptured = false;
-let _captureHeatmap   = null;   // Uint16Array, _GW×_GH cells
-let _captureCount     = 0;      // frames processed in current capture window
-let _captureSkip      = 0;      // frames to idle before next capture attempt
-
-// Tracking (Phase 2)
-let _confirmedBox  = null;
-let _lastSearchBox = null;
-let _missCount     = 0;
-let _lastMAD       = 0;
-
-// Pipeline
 let _proc      = null;
 let _gen       = null;
-let _canvas    = null;   // full-res OffscreenCanvas (drawn + inpainted)
+let _canvas    = null;
 let _ctx       = null;
-let _tinyCanvas = null;  // 64×36 for capture-phase brightness scan
-let _tinyCtx   = null;
 let _active    = false;
 let _pipeCtrl  = null;
 let _W         = 1280;
 let _H         = 720;
-let _GW        = 64;    // ceil(_W / CAPTURE_SCAN_STRIDE)
-let _GH        = 36;    // ceil(_H / CAPTURE_SCAN_STRIDE)
 let _frameCount   = 0;
 let _avgFrameTime = 0;
 let _skipBudget   = false;
+
+// Tracking state
+let _confirmedBox   = null;
+let _candidateBox   = null;
+let _candidateCount = 0;
+let _missCount      = 0;
+
+// Data collection state
+let _sessionPositions = [];
+let _sessionId        = Date.now().toString(36);
+
+// ─── localStorage helper (available as soon as module loads) ──────────────────
+
+if (typeof window !== 'undefined') {
+  window._getWatermarkPositions = () => {
+    try {
+      return JSON.parse(localStorage.getItem('loqii_watermark_positions') || '[]');
+    } catch {
+      return [];
+    }
+  };
+  window._clearWatermarkPositions = () => {
+    localStorage.removeItem('loqii_watermark_positions');
+    console.log('[HUNTER] Position log cleared');
+  };
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -88,13 +101,9 @@ export async function initWatermarkRemover(rawStream) {
     const s     = track.getSettings();
     _W = s.width  || 1280;
     _H = s.height || 720;
-    _GW = Math.ceil(_W / CAPTURE_SCAN_STRIDE);
-    _GH = Math.ceil(_H / CAPTURE_SCAN_STRIDE);
 
-    _canvas    = new OffscreenCanvas(_W, _H);
-    _ctx       = _canvas.getContext('2d', { willReadFrequently: true });
-    _tinyCanvas = new OffscreenCanvas(_GW, _GH);
-    _tinyCtx   = _tinyCanvas.getContext('2d', { willReadFrequently: true });
+    _canvas = new OffscreenCanvas(_W, _H);
+    _ctx    = _canvas.getContext('2d', { willReadFrequently: true });
 
     _proc = new MediaStreamTrackProcessor({ track });
     _gen  = new MediaStreamTrackGenerator({ kind: 'video' });
@@ -108,12 +117,14 @@ export async function initWatermarkRemover(rawStream) {
           _ctx.drawImage(videoFrame, 0, 0, _W, _H);
 
           if (!_skipBudget) {
-            if (!_templateCaptured) {
-              doCaptureTick();
-            } else {
-              doTrackTick();
-              if (_confirmedBox) inpaintBox(_confirmedBox);
+            const imageData = _ctx.getImageData(0, 0, _W, _H);
+            detectAndTrack(imageData);
+
+            // Only inpaint when not collecting data
+            if (!DATA_COLLECTION_MODE && _confirmedBox) {
+              inpaintBox(_confirmedBox);
             }
+
             if (typeof window !== 'undefined' && window._loqiiWatermarkDebug) {
               drawDebugOverlay();
             }
@@ -150,8 +161,14 @@ export async function initWatermarkRemover(rawStream) {
       });
 
     const clean = new MediaStream([_gen, ...rawStream.getAudioTracks()]);
-    _active = true;
-    console.log(`[HUNTER] Initialized — ${_W}×${_H}, capture phase starting`);
+    _active    = true;
+    _sessionId = Date.now().toString(36);
+    _sessionPositions = [];
+    console.log(
+      `[HUNTER] Initialized — ${_W}×${_H}` +
+      ` | DATA_COLLECTION_MODE=${DATA_COLLECTION_MODE}` +
+      ` | session=${_sessionId}`
+    );
     return clean;
   } catch (err) {
     console.error('[HUNTER] Init failed — raw stream fallback:', err);
@@ -163,284 +180,140 @@ export async function initWatermarkRemover(rawStream) {
 export function destroyWatermarkRemover() {
   const was = _active;
   if (_pipeCtrl) { try { _pipeCtrl.abort(); } catch (_) {} _pipeCtrl = null; }
-  _proc = _gen = _canvas = _ctx = _tinyCanvas = _tinyCtx = null;
-  _active = false; _W = 1280; _H = 720; _GW = 64; _GH = 36;
+  _proc = _gen = _canvas = _ctx = null;
+  _active = false; _W = 1280; _H = 720;
   _frameCount = 0; _avgFrameTime = 0; _skipBudget = false;
-  _template = null; _templateBox = null; _templateCaptured = false;
-  _captureHeatmap = null; _captureCount = 0; _captureSkip = 0;
-  _confirmedBox = null; _lastSearchBox = null;
-  _missCount = 0; _lastMAD = 0;
-  if (was) console.log('[HUNTER] Destroyed');
+  _confirmedBox = null; _candidateBox = null; _candidateCount = 0;
+  _missCount = 0;
+  if (was) {
+    console.log(
+      `[HUNTER] Destroyed — session ${_sessionId}` +
+      ` logged ${_sessionPositions.length} positions`
+    );
+  }
 }
 
 export function isWatermarkRemoverActive() { return _active; }
 export function getAverageFrameTime()      { return _avgFrameTime; }
 
-// ─── Phase 1: auto-capture template ──────────────────────────────────────────
+// ─── Detection: brightness-scan row-run ───────────────────────────────────────
 //
-// For CAPTURE_FRAMES frames, downscale the current frame to a _GW×_GH (64×36)
-// canvas using drawImage, then count bright cells (R/G/B all > 180) into a
-// heat map. After 60 frames, the hottest connected cluster with badge proportions
-// becomes the template — its region is captured from the full-res canvas as
-// the reference for Phase 2 MAD matching.
+// For each row (stride 6), find the widest contiguous run of pixels where
+// R > 185 AND G > 185 AND B > 185 (semi-transparent white over any background).
+// Group vertically adjacent matching rows whose horizontal extents overlap by
+// ≥ 40px. Validate bounding box dimensions and aspect ratio.
+// Score 0-100: density component (row count) + aspect component.
 
-function doCaptureTick() {
-  // Idle period after a failed capture attempt
-  if (_captureSkip > 0) {
-    _captureSkip--;
-    return;
-  }
+function detectWatermark(imageData) {
+  const { data, width, height } = imageData;
 
-  // Lazy-init heat map
-  if (!_captureHeatmap) {
-    _captureHeatmap = new Uint16Array(_GW * _GH);
-  }
-
-  // Downsample to tiny canvas and read brightness
-  _tinyCtx.drawImage(_canvas, 0, 0, _GW, _GH);
-  const tiny = _tinyCtx.getImageData(0, 0, _GW, _GH).data;
-
-  for (let gy = 0; gy < _GH; gy++) {
-    for (let gx = 0; gx < _GW; gx++) {
-      const i = (gy * _GW + gx) * 4;
-      if (
-        tiny[i]     > CAPTURE_BRIGHT_THRESH &&
-        tiny[i + 1] > CAPTURE_BRIGHT_THRESH &&
-        tiny[i + 2] > CAPTURE_BRIGHT_THRESH
-      ) {
-        _captureHeatmap[gy * _GW + gx]++;
+  // Per-row: find widest qualifying bright run
+  const rowRuns = [];
+  for (let y = 0; y < height; y += DETECT_STRIDE) {
+    let rs = -1, rw = 0, bestW = 0, bestX = -1;
+    for (let x = 0; x < width; x += DETECT_STRIDE) {
+      const i = (y * width + x) * 4;
+      if (data[i] > DETECT_THRESH && data[i+1] > DETECT_THRESH && data[i+2] > DETECT_THRESH) {
+        if (rs < 0) rs = x;
+        rw += DETECT_STRIDE;
+      } else {
+        if (rw > bestW) { bestW = rw; bestX = rs; }
+        rs = -1; rw = 0;
       }
     }
+    if (rw > bestW) { bestW = rw; bestX = rs; }
+    rowRuns.push(
+      bestW >= DETECT_MIN_W && bestW <= DETECT_MAX_W && bestX >= 0
+        ? { y, x: bestX, w: bestW }
+        : null
+    );
   }
 
-  _captureCount++;
-
-  if (_captureCount >= CAPTURE_FRAMES) {
-    finishCapture();
-  }
-}
-
-function finishCapture() {
-  const bounds = findTemplateBounds();
-
-  if (!bounds) {
-    console.log('[HUNTER] Template capture failed — watermark not detected in first 60 frames. Retrying...');
-    _captureCount = 0;
-    _captureHeatmap.fill(0);
-    _captureSkip = CAPTURE_FRAMES; // idle for 60 more frames before retry
-    return;
-  }
-
-  // Expand detected cluster by 4px padding
-  const px = Math.max(0, bounds.x - 4);
-  const py = Math.max(0, bounds.y - 4);
-  const pw = Math.min(_W - px, bounds.w + 8);
-  const ph = Math.min(_H - py, bounds.h + 8);
-
-  _template    = _ctx.getImageData(px, py, pw, ph).data;
-  _templateBox = { x: px, y: py, w: pw, h: ph };
-  _templateCaptured = true;
-
-  console.log(`[HUNTER] Template captured at (${px},${py},${pw}×${ph})`);
-}
-
-function findTemplateBounds() {
-  const HOT     = CAPTURE_MIN_FRAMES;
-  const visited = new Uint8Array(_GW * _GH);
+  // Group vertically contiguous rows (allow 1 gap row)
   let best = null;
+  for (let i = 0; i < rowRuns.length; i++) {
+    if (!rowRuns[i]) continue;
 
-  for (let gy = 0; gy < _GH; gy++) {
-    for (let gx = 0; gx < _GW; gx++) {
-      const idx0 = gy * _GW + gx;
-      if (visited[idx0] || _captureHeatmap[idx0] < HOT) continue;
+    const group = [rowRuns[i]];
+    let gMinX = rowRuns[i].x;
+    let gMaxX = rowRuns[i].x + rowRuns[i].w;
+    let gaps  = 0;
 
-      // BFS flood-fill over connected hot cells
-      const queue  = [idx0];
-      visited[idx0] = 1;
-      let minGX = gx, maxGX = gx, minGY = gy, maxGY = gy;
-      let totalHeat = 0;
-      let qi = 0;
-
-      while (qi < queue.length) {
-        const idx = queue[qi++];
-        const cy  = (idx / _GW) | 0;
-        const cx  = idx  % _GW;
-        totalHeat += _captureHeatmap[idx];
-
-        // 4-connected neighbours
-        const ns = [
-          cy > 0     ? (cy - 1) * _GW + cx : -1,
-          cy < _GH-1 ? (cy + 1) * _GW + cx : -1,
-          cx > 0     ? cy       * _GW + (cx - 1) : -1,
-          cx < _GW-1 ? cy       * _GW + (cx + 1) : -1,
-        ];
-        for (const ni of ns) {
-          if (ni < 0 || visited[ni] || _captureHeatmap[ni] < HOT) continue;
-          visited[ni] = 1;
-          queue.push(ni);
-          const ny = (ni / _GW) | 0, nx = ni % _GW;
-          if (nx < minGX) minGX = nx;
-          if (nx > maxGX) maxGX = nx;
-          if (ny < minGY) minGY = ny;
-          if (ny > maxGY) maxGY = ny;
-        }
+    for (let j = i + 1; j < rowRuns.length; j++) {
+      if (!rowRuns[j]) {
+        if (++gaps > 1) break;
+        continue;
       }
+      const row     = rowRuns[j];
+      const overlap = Math.min(row.x + row.w, gMaxX) - Math.max(row.x, gMinX);
+      if (overlap < 40) break;
+      group.push(row);
+      if (row.x         < gMinX) gMinX = row.x;
+      if (row.x + row.w > gMaxX) gMaxX = row.x + row.w;
+    }
 
-      // Convert grid → pixel coords
-      const px = minGX * CAPTURE_SCAN_STRIDE;
-      const py = minGY * CAPTURE_SCAN_STRIDE;
-      const pw = (maxGX - minGX + 1) * CAPTURE_SCAN_STRIDE;
-      const ph = (maxGY - minGY + 1) * CAPTURE_SCAN_STRIDE;
+    if (group.length < 2) continue;
 
-      // Validate badge dimensions: 60-200px wide, 15-45px tall
-      if (pw >= 60 && pw <= 200 && ph >= 15 && ph <= 45) {
-        if (!best || totalHeat > best.heat) {
-          best = { x: px, y: py, w: pw, h: ph, heat: totalHeat };
-        }
-      }
+    const bw   = gMaxX - gMinX;
+    const minY = group[0].y;
+    const maxY = group[group.length - 1].y + DETECT_STRIDE;
+    const bh   = maxY - minY;
+    if (bh > DETECT_MAX_H)                  continue;
+    if (bw / Math.max(bh, 1) < DETECT_MIN_ASPECT) continue;
+
+    // Score 0-100: aspect quality (0-50) + row density (0-50)
+    const aspect      = bw / Math.max(bh, 1);
+    const aspectScore = Math.max(0, 50 - Math.abs(aspect - 4.0) * 6);
+    const densityScore = Math.min(50, group.length * 10);
+    const score = Math.round(aspectScore + densityScore);
+
+    if (!best || score > best.score) {
+      best = { x: gMinX, y: minY, w: bw, h: bh, score };
     }
   }
 
   return best;
 }
 
-// ─── Phase 2: template search ─────────────────────────────────────────────────
+// ─── Temporal tracking ───────────────────────────────────────────────────────
 //
-// Each tracking frame:
-//   1. Window search — 5×5 sub-grid ±50px around last confirmed position.
-//      Uses a partial getImageData (cheap, ~0.1ms). Threshold: MAD ≤ 30.
-//   2. Full grid search — 4×4 grid covering the whole frame + 5×5 refinement.
-//      Uses full-frame getImageData (~3ms). Threshold: MAD ≤ 50.
-// Jump at >150px centroid distance updates _confirmedBox immediately.
-// After MISS_TOLERANCE consecutive misses, tracking is cleared.
+// Requires CONFIRM_FRAMES consecutive detections within CONFIRM_DIST px before
+// logging. Logs a new entry only when centroid moves > LOG_MIN_DIST px from the
+// last logged position. Clears after MISS_TOLERANCE consecutive misses.
 
-function doTrackTick() {
-  const { w: tw, h: th } = _templateBox;
-  let found = null;
+function detectAndTrack(imageData) {
+  const candidate = detectWatermark(imageData);
 
-  // --- Window search (fast path, common case) ---
-  if (_lastSearchBox) {
-    const RANGE = 50;
-    const wx  = Math.max(0, _lastSearchBox.x - RANGE);
-    const wy  = Math.max(0, _lastSearchBox.y - RANGE);
-    const ww  = Math.min(_W - wx, tw + RANGE * 2);
-    const wh  = Math.min(_H - wy, th + RANGE * 2);
-    const win = _ctx.getImageData(wx, wy, ww, wh).data;
-
-    let bestMAD = Infinity, bestX = -1, bestY = -1;
-    const STEPS = 5;
-    for (let i = 0; i < STEPS; i++) {
-      for (let j = 0; j < STEPS; j++) {
-        const ox = Math.round((i / (STEPS - 1)) * Math.max(0, ww - tw));
-        const oy = Math.round((j / (STEPS - 1)) * Math.max(0, wh - th));
-        if (ox + tw > ww || oy + th > wh) continue;
-        const m = madWindow(win, ww, ox, oy, tw, th);
-        if (m < bestMAD) { bestMAD = m; bestX = wx + ox; bestY = wy + oy; }
-      }
-    }
-    if (bestMAD <= TEMPLATE_MAD_THRESHOLD) {
-      _lastMAD = bestMAD;
-      found = { x: bestX, y: bestY, w: tw, h: th };
-    }
-  }
-
-  // --- Full grid search (slow path, on jump or initial find) ---
-  if (!found) {
-    const frame = _ctx.getImageData(0, 0, _W, _H).data;
-
-    const stepX = (_W - tw) / (GRID_DIVISIONS - 1);
-    const stepY = (_H - th) / (GRID_DIVISIONS - 1);
-
-    let bestMAD = Infinity, bestX = -1, bestY = -1;
-
-    for (let gy = 0; gy < GRID_DIVISIONS; gy++) {
-      for (let gx = 0; gx < GRID_DIVISIONS; gx++) {
-        const sx = Math.round(gx * stepX);
-        const sy = Math.round(gy * stepY);
-        if (sx < 0 || sy < 0 || sx + tw > _W || sy + th > _H) continue;
-        const m = madFrame(frame, sx, sy, tw, th);
-        if (m < bestMAD) { bestMAD = m; bestX = sx; bestY = sy; }
-      }
-    }
-
-    // Refine around best grid point (±half a grid step, 5×5 sub-grid)
-    if (bestMAD <= TEMPLATE_MAD_POSSIBLE) {
-      const refRange = Math.round(stepX / 2);
-      const RSTEPS   = 5;
-      for (let i = 0; i < RSTEPS; i++) {
-        for (let j = 0; j < RSTEPS; j++) {
-          const sx = bestX + Math.round((i / (RSTEPS - 1) - 0.5) * 2 * refRange);
-          const sy = bestY + Math.round((j / (RSTEPS - 1) - 0.5) * 2 * refRange);
-          if (sx < 0 || sy < 0 || sx + tw > _W || sy + th > _H) continue;
-          const m = madFrame(frame, sx, sy, tw, th);
-          if (m < bestMAD) { bestMAD = m; bestX = sx; bestY = sy; }
-        }
-      }
-      if (bestMAD <= TEMPLATE_MAD_POSSIBLE) {
-        _lastMAD = bestMAD;
-        found = { x: bestX, y: bestY, w: tw, h: th };
-      }
-    }
-  }
-
-  // --- Update tracking state ---
-  if (found) {
-    if (_confirmedBox) {
-      const d = centroidDist(_confirmedBox, found);
-      if (d > JUMP_THRESHOLD) {
-        console.log(
-          '[HUNTER] Jump:',
-          `(${(_confirmedBox.x + _confirmedBox.w / 2) | 0},` +
-          `${(_confirmedBox.y + _confirmedBox.h / 2) | 0})`,
-          '→',
-          `(${(found.x + found.w / 2) | 0},${(found.y + found.h / 2) | 0})`,
-          `distance=${Math.round(d)}px`
-        );
-      }
-    }
-    _confirmedBox  = found;
-    _lastSearchBox = found;
-    _missCount     = 0;
-  } else {
+  if (!candidate) {
     _missCount++;
     if (_missCount >= MISS_TOLERANCE) {
-      console.log(`[HUNTER] Lost tracking after ${_missCount} miss frames`);
-      _confirmedBox  = null;
-      _lastSearchBox = null;
+      _confirmedBox   = null;
+      _candidateBox   = null;
+      _candidateCount = 0;
     }
+    return;
   }
-}
 
-// MAD against _template using full-frame ImageData (_W-stride)
-function madFrame(data, x, y, tw, th) {
-  let diff = 0, count = 0;
-  for (let dy = 0; dy < th; dy += SEARCH_STEP) {
-    for (let dx = 0; dx < tw; dx += SEARCH_STEP) {
-      const si = ((y + dy) * _W + (x + dx)) * 4;
-      const ti = (dy * tw + dx) * 4;
-      diff += Math.abs(data[si]     - _template[ti])
-            + Math.abs(data[si + 1] - _template[ti + 1])
-            + Math.abs(data[si + 2] - _template[ti + 2]);
-      count++;
-    }
-  }
-  return count > 0 ? diff / count : Infinity;
-}
+  _missCount = 0;
 
-// MAD against _template using window ImageData (ww-stride, window-local offsets)
-function madWindow(data, ww, ox, oy, tw, th) {
-  let diff = 0, count = 0;
-  for (let dy = 0; dy < th; dy += SEARCH_STEP) {
-    for (let dx = 0; dx < tw; dx += SEARCH_STEP) {
-      const si = ((oy + dy) * ww + (ox + dx)) * 4;
-      const ti = (dy * tw + dx) * 4;
-      diff += Math.abs(data[si]     - _template[ti])
-            + Math.abs(data[si + 1] - _template[ti + 1])
-            + Math.abs(data[si + 2] - _template[ti + 2]);
-      count++;
+  if (_candidateBox && centroidDist(_candidateBox, candidate) <= CONFIRM_DIST) {
+    _candidateCount++;
+    _candidateBox = candidate;
+
+    if (_candidateCount >= CONFIRM_FRAMES) {
+      const isNewPosition = !_confirmedBox ||
+        centroidDist(_confirmedBox, candidate) > LOG_MIN_DIST;
+
+      _confirmedBox = { ...candidate };
+
+      if (isNewPosition) {
+        logPosition(candidate);
+      }
     }
+  } else {
+    _candidateBox   = candidate;
+    _candidateCount = 1;
   }
-  return count > 0 ? diff / count : Infinity;
 }
 
 function centroidDist(a, b) {
@@ -449,8 +322,42 @@ function centroidDist(a, b) {
   return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
 }
 
-// ─── Stage 4: adaptive inpainting ────────────────────────────────────────────
-// (Identical to the Sobel version — 4-border bilinear blend + 2-pixel feather.)
+// ─── Position logging ─────────────────────────────────────────────────────────
+
+function logPosition(box) {
+  const entry = {
+    x:       box.x,
+    y:       box.y,
+    w:       box.w,
+    h:       box.h,
+    score:   box.score,
+    frame:   _frameCount,
+    session: _sessionId,
+    ts:      Date.now(),
+  };
+
+  console.log(
+    `[POSITION] (${box.x},${box.y},${box.w}×${box.h})` +
+    ` score=${box.score} frame=${_frameCount} session=${_sessionId}`
+  );
+
+  _sessionPositions.push(entry);
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const existing = JSON.parse(
+        localStorage.getItem('loqii_watermark_positions') || '[]'
+      );
+      existing.push(entry);
+      localStorage.setItem('loqii_watermark_positions', JSON.stringify(existing));
+    } catch (err) {
+      console.warn('[HUNTER] localStorage write failed:', err.message);
+    }
+  }
+}
+
+// ─── Adaptive inpainting (active when DATA_COLLECTION_MODE = false) ───────────
+// 4-border bilinear blend + 2-pixel edge feather.
 
 function inpaintBox(box) {
   const { x, y, w, h } = box;
@@ -471,9 +378,9 @@ function inpaintBox(box) {
       let r = 0, g = 0, b = 0;
       for (let row = 0; row < rows; row++) {
         const i = (row * cols + c) * 4;
-        r += d[i]; g += d[i + 1]; b += d[i + 2];
+        r += d[i]; g += d[i+1]; b += d[i+2];
       }
-      o[c * 3] = r / rows; o[c * 3 + 1] = g / rows; o[c * 3 + 2] = b / rows;
+      o[c*3]=r/rows; o[c*3+1]=g/rows; o[c*3+2]=b/rows;
     }
     return o;
   }
@@ -484,9 +391,9 @@ function inpaintBox(box) {
       let rv = 0, gv = 0, bv = 0;
       for (let c = 0; c < cols; c++) {
         const i = (r * cols + c) * 4;
-        rv += d[i]; gv += d[i + 1]; bv += d[i + 2];
+        rv += d[i]; gv += d[i+1]; bv += d[i+2];
       }
-      o[r * 3] = rv / cols; o[r * 3 + 1] = gv / cols; o[r * 3 + 2] = bv / cols;
+      o[r*3]=rv/cols; o[r*3+1]=gv/cols; o[r*3+2]=bv/cols;
     }
     return o;
   }
@@ -510,37 +417,37 @@ function inpaintBox(box) {
 
       let tbR = 0, tbG = 0, tbB = 0, tbW = 0;
       if (above && below) {
-        tbR = above[ci] * (1 - t) + below[ci] * t;
-        tbG = above[ci + 1] * (1 - t) + below[ci + 1] * t;
-        tbB = above[ci + 2] * (1 - t) + below[ci + 2] * t; tbW = 1;
-      } else if (above) { tbR = above[ci]; tbG = above[ci+1]; tbB = above[ci+2]; tbW = 1; }
-      else if (below)   { tbR = below[ci]; tbG = below[ci+1]; tbB = below[ci+2]; tbW = 1; }
+        tbR = above[ci]*(1-t)+below[ci]*t;
+        tbG = above[ci+1]*(1-t)+below[ci+1]*t;
+        tbB = above[ci+2]*(1-t)+below[ci+2]*t; tbW = 1;
+      } else if (above) { tbR=above[ci]; tbG=above[ci+1]; tbB=above[ci+2]; tbW=1; }
+      else if (below)   { tbR=below[ci]; tbG=below[ci+1]; tbB=below[ci+2]; tbW=1; }
 
       let lrR = 0, lrG = 0, lrB = 0, lrW = 0;
       if (left && right) {
-        lrR = left[ri] * (1 - s) + right[ri] * s;
-        lrG = left[ri + 1] * (1 - s) + right[ri + 1] * s;
-        lrB = left[ri + 2] * (1 - s) + right[ri + 2] * s; lrW = 1;
-      } else if (left)  { lrR = left[ri];  lrG = left[ri+1];  lrB = left[ri+2];  lrW = 1; }
-      else if (right)   { lrR = right[ri]; lrG = right[ri+1]; lrB = right[ri+2]; lrW = 1; }
+        lrR = left[ri]*(1-s)+right[ri]*s;
+        lrG = left[ri+1]*(1-s)+right[ri+1]*s;
+        lrB = left[ri+2]*(1-s)+right[ri+2]*s; lrW = 1;
+      } else if (left)  { lrR=left[ri];  lrG=left[ri+1];  lrB=left[ri+2];  lrW=1; }
+      else if (right)   { lrR=right[ri]; lrG=right[ri+1]; lrB=right[ri+2]; lrW=1; }
 
-      const tw2 = tbW + lrW || 1;
-      let fR = (tbR * tbW + lrR * lrW) / tw2;
-      let fG = (tbG * tbW + lrG * lrW) / tw2;
-      let fB = (tbB * tbW + lrB * lrW) / tw2;
+      const tw = tbW + lrW || 1;
+      let fR = (tbR*tbW + lrR*lrW) / tw;
+      let fG = (tbG*tbW + lrG*lrW) / tw;
+      let fB = (tbB*tbW + lrB*lrW) / tw;
 
-      const bd = Math.min(fx, fy, rw - 1 - fx, rh - 1 - fy);
+      const bd = Math.min(fx, fy, rw-1-fx, rh-1-fy);
       if (bd < 2) {
         const op = 0.6 + bd * 0.2;
-        fR = fR * op + orig[fi]     * (1 - op);
-        fG = fG * op + orig[fi + 1] * (1 - op);
-        fB = fB * op + orig[fi + 2] * (1 - op);
+        fR = fR*op + orig[fi]   *(1-op);
+        fG = fG*op + orig[fi+1] *(1-op);
+        fB = fB*op + orig[fi+2] *(1-op);
       }
 
-      fill.data[fi]     = (fR + 0.5) | 0;
-      fill.data[fi + 1] = (fG + 0.5) | 0;
-      fill.data[fi + 2] = (fB + 0.5) | 0;
-      fill.data[fi + 3] = 255;
+      fill.data[fi]   = (fR+0.5)|0;
+      fill.data[fi+1] = (fG+0.5)|0;
+      fill.data[fi+2] = (fB+0.5)|0;
+      fill.data[fi+3] = 255;
     }
   }
 
@@ -549,71 +456,36 @@ function inpaintBox(box) {
 
 // ─── Debug overlay ────────────────────────────────────────────────────────────
 //
-// Activated by: window._loqiiWatermarkDebug = true
-//
-// Capture phase: yellow dots on hot heat-map cells +
-//                HUD "HUNTER: capturing... frame N/60"
-// Tracking phase: red box = confirmed, blue box = window search area +
-//                 HUD "HUNTER: confirmed=(x,y) MAD=N avgMs=X"
+// window._loqiiWatermarkDebug = true
+// Yellow box = candidate, Red box = confirmed
+// HUD shows mode, position count, score, avgMs
 
 function drawDebugOverlay() {
   _ctx.save();
 
-  if (!_templateCaptured) {
-    // Show capture progress
-    if (_captureHeatmap) {
-      _ctx.fillStyle = 'rgba(255,255,0,0.55)';
-      for (let gy = 0; gy < _GH; gy++) {
-        for (let gx = 0; gx < _GW; gx++) {
-          if (_captureHeatmap[gy * _GW + gx] >= CAPTURE_MIN_FRAMES) {
-            _ctx.fillRect(
-              gx * CAPTURE_SCAN_STRIDE,
-              gy * CAPTURE_SCAN_STRIDE,
-              4, 4
-            );
-          }
-        }
-      }
-    }
-    _ctx.fillStyle = 'rgba(0,0,0,0.65)';
-    _ctx.fillRect(4, 4, 320, 22);
-    _ctx.fillStyle = '#ffee00';
-    _ctx.font      = '12px monospace';
-    _ctx.fillText(
-      `HUNTER: capturing... frame ${_captureCount}/${CAPTURE_FRAMES}`,
-      8, 19
-    );
-  } else {
-    // Confirmed box (red)
-    if (_confirmedBox) {
-      _ctx.strokeStyle = 'rgba(255,0,0,0.9)';
-      _ctx.lineWidth   = 2;
-      _ctx.strokeRect(_confirmedBox.x, _confirmedBox.y, _confirmedBox.w, _confirmedBox.h);
-    }
-    // Window search area (blue)
-    if (_lastSearchBox && _templateBox) {
-      const RANGE = 50;
-      _ctx.strokeStyle = 'rgba(0,150,255,0.6)';
-      _ctx.lineWidth   = 1;
-      _ctx.strokeRect(
-        Math.max(0, _lastSearchBox.x - RANGE),
-        Math.max(0, _lastSearchBox.y - RANGE),
-        _templateBox.w + RANGE * 2,
-        _templateBox.h + RANGE * 2
-      );
-    }
-    const cx = _confirmedBox
-      ? `(${_confirmedBox.x},${_confirmedBox.y})`
-      : 'none';
-    _ctx.fillStyle = 'rgba(0,0,0,0.65)';
-    _ctx.fillRect(4, 4, 440, 22);
-    _ctx.fillStyle = '#00ff88';
-    _ctx.font      = '12px monospace';
-    _ctx.fillText(
-      `HUNTER: confirmed=${cx}  MAD=${_lastMAD.toFixed(0)}  avgMs=${_avgFrameTime.toFixed(1)}`,
-      8, 19
-    );
+  if (_candidateBox) {
+    _ctx.strokeStyle = 'rgba(255,255,0,0.7)';
+    _ctx.lineWidth   = 1;
+    _ctx.strokeRect(_candidateBox.x, _candidateBox.y, _candidateBox.w, _candidateBox.h);
   }
+  if (_confirmedBox) {
+    _ctx.strokeStyle = 'rgba(255,0,0,0.9)';
+    _ctx.lineWidth   = 2;
+    _ctx.strokeRect(_confirmedBox.x, _confirmedBox.y, _confirmedBox.w, _confirmedBox.h);
+  }
+
+  const mode = DATA_COLLECTION_MODE ? 'COLLECT' : 'INPAINT';
+  const cx   = _confirmedBox
+    ? `(${_confirmedBox.x},${_confirmedBox.y} ${_confirmedBox.w}×${_confirmedBox.h})`
+    : 'none';
+  _ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  _ctx.fillRect(4, 4, 500, 22);
+  _ctx.fillStyle = DATA_COLLECTION_MODE ? '#ffee00' : '#00ff88';
+  _ctx.font      = '12px monospace';
+  _ctx.fillText(
+    `HUNTER[${mode}]: ${cx}  n=${_sessionPositions.length}  avgMs=${_avgFrameTime.toFixed(1)}`,
+    8, 19
+  );
 
   _ctx.restore();
 }
