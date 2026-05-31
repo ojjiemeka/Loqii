@@ -3,7 +3,7 @@
 //
 // Stage 1 — Sobel edge detection on half-res (640×360) frame
 // Stage 2 — Candidate scoring: edge density, color variance, aspect ratio
-// Stage 3 — Temporal tracking: 1-frame confirmation, jump detection, miss tolerance
+// Stage 3 — Temporal tracking: 2-frame confirmation, jump detection, miss tolerance
 // Stage 4 — Adaptive inpainting: 4-border blend + edge feathering
 //
 // Exports the same public API as watermarkRemover.js so index.html
@@ -17,9 +17,9 @@ const BADGE_MIN_HEIGHT = 20;
 const BADGE_MAX_HEIGHT = 42;
 const BADGE_MIN_ASPECT = 2.5;
 const BADGE_MAX_ASPECT = 8.0;
-const CONFIRM_FRAMES   = 1;
+const CONFIRM_FRAMES   = 2;
 const MISS_TOLERANCE   = 8;
-const JUMP_THRESHOLD   = 50;
+const JUMP_THRESHOLD   = 120;
 const SCORE_THRESHOLD  = 55;
 const EDGE_THRESH      = 22;   // Sobel magnitude for an "edge" pixel
 const INPAINT_SAMP     = 12;   // px strip sampled on each side for inpainting
@@ -59,6 +59,8 @@ let _missCount      = 0;
 let _lastScore      = 0;
 let _lastJumpFrame  = 0;
 let _lastJumpTime   = 0;
+let _positionHistory = [];  // ring buffer (max 4) of recently confirmed centroids
+let _candidateSize   = null; // {w,h} of candidate being accumulated
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -162,6 +164,7 @@ export function destroyWatermarkRemover() {
   _candidateBox = null; _candidateCount = 0;
   _missCount = 0; _lastScore = 0;
   _lastJumpFrame = 0; _lastJumpTime = 0;
+  _positionHistory = []; _candidateSize = null;
   if (was) console.log('[HUNTER] Destroyed');
 }
 
@@ -343,8 +346,19 @@ function detectAndTrack() {
   if (_confirmedBox) {
     const d = centroidDist(_confirmedBox, candidate);
     if (d > JUMP_THRESHOLD) {
-      const now           = performance.now();
-      const intervalMs    = _lastJumpTime > 0 ? Math.round(now - _lastJumpTime) : 0;
+      // Oscillation guard: reject if new centroid matches a recently confirmed position
+      const isOscillating = _positionHistory.some(prev => {
+        const dx = Math.abs(prev.x - candidate.x);
+        const dy = Math.abs(prev.y - candidate.y);
+        return Math.sqrt(dx * dx + dy * dy) < 20;
+      });
+      if (isOscillating) {
+        console.log('[HUNTER] Oscillation suppressed at', candidate.x, candidate.y);
+        return; // keep current _confirmedBox
+      }
+
+      const now            = performance.now();
+      const intervalMs     = _lastJumpTime > 0 ? Math.round(now - _lastJumpTime) : 0;
       const intervalFrames = _frameCount - _lastJumpFrame;
       _lastJumpTime  = now;
       _lastJumpFrame = _frameCount;
@@ -357,14 +371,17 @@ function detectAndTrack() {
         `${(candidate.y + candidate.h / 2) | 0})`,
         `distance=${Math.round(d)}px`
       );
-      if (_lastJumpTime > 0 && intervalMs > 0) {
+      if (intervalMs > 0) {
         console.log(`[HUNTER] Jump interval: ${intervalMs}ms (${intervalFrames} frames since last jump)`);
       }
-      // Confirm new position immediately — no 3-frame queue after a jump
+      // Add to history and confirm new position immediately
+      _positionHistory.push({ x: candidate.x, y: candidate.y });
+      if (_positionHistory.length > 4) _positionHistory.shift();
       _confirmedBox   = { ...candidate };
       _confirmedAt    = _frameCount;
       _candidateBox   = null;
       _candidateCount = 0;
+      _candidateSize  = null;
       return;
     }
     // Smooth-update confirmed position with low momentum (prevents drift)
@@ -375,10 +392,38 @@ function detectAndTrack() {
 
   // Accumulate candidate frames until CONFIRM_FRAMES reached
   if (_candidateBox && centroidDist(_candidateBox, candidate) <= 8) {
+    // Stability check: consistent size across confirmation frames
+    if (_candidateSize) {
+      const dw = Math.abs(candidate.w - _candidateSize.w);
+      const dh = Math.abs(candidate.h - _candidateSize.h);
+      if (dw > 15 || dh > 15) {
+        _candidateBox   = null;
+        _candidateCount = 0;
+        _candidateSize  = null;
+        return;
+      }
+    }
+    _candidateSize = { w: candidate.w, h: candidate.h };
     _candidateCount++;
     _candidateBox = smoothBox(_candidateBox, candidate, 0.5);
     _lastScore    = candidate.score;
+
     if (_candidateCount >= CONFIRM_FRAMES) {
+      // Oscillation guard: reject if position matches recent confirmed history
+      const isOscillating = _positionHistory.some(prev => {
+        const dx = Math.abs(prev.x - _candidateBox.x);
+        const dy = Math.abs(prev.y - _candidateBox.y);
+        return Math.sqrt(dx * dx + dy * dy) < 20;
+      });
+      if (isOscillating && _confirmedBox) {
+        console.log('[HUNTER] Oscillation suppressed at', _candidateBox.x, _candidateBox.y);
+        _candidateBox   = null;
+        _candidateCount = 0;
+        _candidateSize  = null;
+        return;
+      }
+      _positionHistory.push({ x: _candidateBox.x, y: _candidateBox.y });
+      if (_positionHistory.length > 4) _positionHistory.shift();
       _confirmedBox = { ..._candidateBox };
       _confirmedAt  = _frameCount;
       console.log(
@@ -390,6 +435,7 @@ function detectAndTrack() {
   } else {
     _candidateBox   = candidate;
     _candidateCount = 1;
+    _candidateSize  = null;
   }
 }
 

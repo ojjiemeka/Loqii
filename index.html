@@ -2614,9 +2614,10 @@ if (!ok) return; // error overlay shown - do nothing further
 
 //  State 
 let sessionPingInterval  = null;
-let realtimeClient       = null;
-let webcamStream         = null;
-let isConnected          = false;
+let realtimeClient         = null;
+let webcamStream           = null;
+let isConnected            = false;
+let _watermarkInitialized  = false;
 let sessionTimer         = null;
 let sessionStart         = 0;
 let obsWs                = null;
@@ -4518,6 +4519,7 @@ async function resetRuntimeSessionState(reason = "runtime_reset") {
     webcamStream = null;
     if (inputVideo) inputVideo.srcObject = null;
     destroyWatermarkRemover();
+    _watermarkInitialized = false;
     if (outputVideo?.srcObject) {
       outputVideo.srcObject.getTracks?.().forEach(t => {
         try { t.stop(); } catch (_) {}
@@ -4788,9 +4790,24 @@ btnStart.addEventListener("click", async () => {
       model,
       onRemoteStream: async (transformedStream) => {
         console.log("[DEBUG] onRemoteStream fired", transformedStream);
-        const streamToUse = (window._featureFlags?.enable_watermark_removal !== false)
-          ? await initWatermarkRemover(transformedStream).catch(() => transformedStream)
-          : transformedStream;
+        // Ignore audio-only callbacks (Decart SDK may fire once per track)
+        if (!transformedStream.getVideoTracks().length) return;
+        // Guard against double-fire corrupting the pipeline
+        if (_watermarkInitialized) {
+          console.warn("[HUNTER] onRemoteStream called twice — skipping re-init");
+          outputVideo.srcObject = transformedStream;
+          outputVideo.play().catch(() => {});
+          return;
+        }
+        _watermarkInitialized = true;
+        let streamToUse = transformedStream;
+        if (window._featureFlags?.enable_watermark_removal !== false) {
+          try {
+            streamToUse = await initWatermarkRemover(transformedStream).catch(() => transformedStream);
+          } catch (err) {
+            console.error("[HUNTER] Init failed, using raw stream:", err);
+          }
+        }
         outputVideo.srcObject  = streamToUse;
         outputVideo.muted      = false;
         outputPh.style.display = "none";
