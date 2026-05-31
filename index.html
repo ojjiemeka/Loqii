@@ -4794,9 +4794,7 @@ btnStart.addEventListener("click", async () => {
         if (!transformedStream.getVideoTracks().length) return;
         // Guard against double-fire corrupting the pipeline
         if (_watermarkInitialized) {
-          console.warn("[HUNTER] onRemoteStream called twice — skipping re-init");
-          outputVideo.srcObject = transformedStream;
-          outputVideo.play().catch(() => {});
+          console.warn("[HUNTER] onRemoteStream called twice — clean stream preserved, ignoring second call");
           return;
         }
         _watermarkInitialized = true;
