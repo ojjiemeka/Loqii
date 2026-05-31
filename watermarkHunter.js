@@ -1,43 +1,51 @@
-// watermarkHunter.js — DATA COLLECTION MODE
+// watermarkHunter.js — hardcoded zone coverage
 //
-// Detects watermark positions using the brightness-scan row-run approach
-// (the original method that consistently scored 67-95) and logs every
-// confirmed position to console + localStorage.
+// No detection. No template matching. No brightness scan.
+// Every frame: inpaint all known watermark positions.
 //
-// DATA_COLLECTION_MODE = true  → detect and log only, NO inpainting.
-//                              Run 5-10 sessions, then call:
-//                                console.table(window._getWatermarkPositions())
-//                              to see the full position map.
+// Zones were derived from Sobel-session confirmed detections (scores 58-95,
+// width 70-100px, height 18-32px) with ±30px padding on each side.
 //
-// DATA_COLLECTION_MODE = false → inpainting enabled (for future hardcoded zones).
+// To add new zones in future:
+//   1. Check out the data-collection tag (git checkout v-data-collect)
+//   2. Start sessions and run:  console.table(window._getWatermarkPositions())
+//   3. Filter for width < 130 AND height < 40 — those are real watermark hits.
+//      Entries with width > 150 are false positives (face / wall highlights).
+//   4. Expand by ±30px and add to WATERMARK_ZONES below.
 //
-// Public API identical to watermarkRemover.js.
+// Public API is identical to watermarkRemover.js.
 
-// ─── Mode flag ───────────────────────────────────────────────────────────────
+// ─── Hardcoded watermark zones ────────────────────────────────────────────────
 
-const DATA_COLLECTION_MODE = true;
+const WATERMARK_ZONES = [
+  // Right-side cluster
+  { x: 1140, y: 410, w: 160, h: 60 },  // confirmed (1198,444,80×20) score=70
+  { x: 1170, y: 415, w: 160, h: 60 },  // confirmed (1232,453,90×22) score=69
+  { x: 1125, y: 625, w: 170, h: 60 },  // confirmed (1165,658,96×23) score=67
+  { x: 1140, y: 395, w: 160, h: 55 },  // confirmed (1188,442,90×22) score=69
 
-// ─── Detection constants ──────────────────────────────────────────────────────
+  // Center-right cluster
+  { x: 800,  y: 500, w: 160, h: 60 },  // confirmed (858,538,86×20)  score=95
+  { x: 570,  y: 525, w: 155, h: 65 },  // confirmed (585,508,72×24)  score=60
+  { x: 575,  y: 535, w: 155, h: 65 },  // confirmed (566,562,79×28)  score=60 / (637,568,72×21)
+  { x: 570,  y: 235, w: 155, h: 60 },  // confirmed (616,276,88×28)  score=67 / (618,334)
+  { x: 640,  y: 135, w: 155, h: 60 },  // estimated  (745,180,90×25)
+  { x: 570,  y: 125, w: 155, h: 60 },  // estimated  (620,166,90×25)
 
-const DETECT_STRIDE = 6;     // pixel stride for brightness scan
-const DETECT_THRESH = 185;   // R/G/B threshold — all channels must exceed this
-const DETECT_MIN_W  = 60;    // min badge width in px
-const DETECT_MAX_W  = 280;   // max badge width in px
-const DETECT_MAX_H  = 60;    // max badge height in px
-const DETECT_MIN_ASPECT = 1.5;
+  // Left-side cluster
+  { x: 370,  y: 600, w: 160, h: 65 },  // confirmed (432,642,88×22)  score=70
+  { x: 370,  y: 145, w: 155, h: 60 },  // confirmed (431,187,79×21)  score=70
+  { x: 65,   y: 40,  w: 165, h: 60 },  // confirmed (128,76,100×20)  score=86
+  { x: 170,  y: 305, w: 155, h: 65 },  // confirmed (232,342,80×32)  score=58
+  { x: 205,  y: 320, w: 160, h: 60 },  // estimated  (270,358,90×25)
+  { x: 250,  y: 490, w: 155, h: 60 },  // estimated  (318,525,90×25)
+];
 
-// ─── Tracking constants ───────────────────────────────────────────────────────
-
-const CONFIRM_FRAMES  = 2;   // consecutive frames at same position before logging
-const MISS_TOLERANCE  = 8;   // frames without detection before clearing confirmed box
-const CONFIRM_DIST    = 15;  // px — candidate must stay within this to accumulate
-const LOG_MIN_DIST    = 20;  // px — log new entry only if centroid moved this far
-
-// ─── Inpainting constant (used when DATA_COLLECTION_MODE = false) ─────────────
+// ─── Inpaint constants ────────────────────────────────────────────────────────
 
 const INPAINT_SAMP = 12;
 
-// ─── Module state ────────────────────────────────────────────────────────────
+// ─── Module state ─────────────────────────────────────────────────────────────
 
 let _proc      = null;
 let _gen       = null;
@@ -49,35 +57,8 @@ let _W         = 1280;
 let _H         = 720;
 let _frameCount   = 0;
 let _avgFrameTime = 0;
-let _skipBudget   = false;
 
-// Tracking state
-let _confirmedBox   = null;
-let _candidateBox   = null;
-let _candidateCount = 0;
-let _missCount      = 0;
-
-// Data collection state
-let _sessionPositions = [];
-let _sessionId        = Date.now().toString(36);
-
-// ─── localStorage helper (available as soon as module loads) ──────────────────
-
-if (typeof window !== 'undefined') {
-  window._getWatermarkPositions = () => {
-    try {
-      return JSON.parse(localStorage.getItem('loqii_watermark_positions') || '[]');
-    } catch {
-      return [];
-    }
-  };
-  window._clearWatermarkPositions = () => {
-    localStorage.removeItem('loqii_watermark_positions');
-    console.log('[HUNTER] Position log cleared');
-  };
-}
-
-// ─── Public API ──────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function initWatermarkRemover(rawStream) {
   destroyWatermarkRemover();
@@ -110,24 +91,17 @@ export async function initWatermarkRemover(rawStream) {
 
     const ts = new TransformStream({
       transform(videoFrame, controller) {
-        _frameCount++;
         const t0 = performance.now();
         let clean = null;
         try {
           _ctx.drawImage(videoFrame, 0, 0, _W, _H);
 
-          if (!_skipBudget) {
-            const imageData = _ctx.getImageData(0, 0, _W, _H);
-            detectAndTrack(imageData);
+          for (const zone of WATERMARK_ZONES) {
+            inpaintBox(zone);
+          }
 
-            // Only inpaint when not collecting data
-            if (!DATA_COLLECTION_MODE && _confirmedBox) {
-              inpaintBox(_confirmedBox);
-            }
-
-            if (typeof window !== 'undefined' && window._loqiiWatermarkDebug) {
-              drawDebugOverlay();
-            }
+          if (typeof window !== 'undefined' && window._loqiiWatermarkDebug) {
+            drawDebugOverlay();
           }
 
           const init = { timestamp: videoFrame.timestamp };
@@ -135,11 +109,16 @@ export async function initWatermarkRemover(rawStream) {
           clean = new VideoFrame(_canvas, init);
 
           const ms = performance.now() - t0;
-          _skipBudget = ms > 40;
-          if (_skipBudget) {
-            console.warn(`[HUNTER] Frame budget exceeded ${ms.toFixed(0)}ms — passing through`);
+          _frameCount++;
+          _avgFrameTime = _avgFrameTime * 0.95 + ms * 0.05;
+
+          if (_frameCount % 120 === 0) {
+            console.log(
+              '[HUNTER] Frame', _frameCount,
+              'avgMs:', _avgFrameTime.toFixed(1),
+              'zones:', WATERMARK_ZONES.length
+            );
           }
-          _avgFrameTime += (ms - _avgFrameTime) / _frameCount;
 
           videoFrame.close();
           controller.enqueue(clean);
@@ -161,13 +140,9 @@ export async function initWatermarkRemover(rawStream) {
       });
 
     const clean = new MediaStream([_gen, ...rawStream.getAudioTracks()]);
-    _active    = true;
-    _sessionId = Date.now().toString(36);
-    _sessionPositions = [];
+    _active = true;
     console.log(
-      `[HUNTER] Initialized — ${_W}×${_H}` +
-      ` | DATA_COLLECTION_MODE=${DATA_COLLECTION_MODE}` +
-      ` | session=${_sessionId}`
+      `[HUNTER] Initialized — ${_W}×${_H}, covering ${WATERMARK_ZONES.length} zones`
     );
     return clean;
   } catch (err) {
@@ -182,181 +157,14 @@ export function destroyWatermarkRemover() {
   if (_pipeCtrl) { try { _pipeCtrl.abort(); } catch (_) {} _pipeCtrl = null; }
   _proc = _gen = _canvas = _ctx = null;
   _active = false; _W = 1280; _H = 720;
-  _frameCount = 0; _avgFrameTime = 0; _skipBudget = false;
-  _confirmedBox = null; _candidateBox = null; _candidateCount = 0;
-  _missCount = 0;
-  if (was) {
-    console.log(
-      `[HUNTER] Destroyed — session ${_sessionId}` +
-      ` logged ${_sessionPositions.length} positions`
-    );
-  }
+  _frameCount = 0; _avgFrameTime = 0;
+  if (was) console.log('[HUNTER] Destroyed');
 }
 
 export function isWatermarkRemoverActive() { return _active; }
 export function getAverageFrameTime()      { return _avgFrameTime; }
 
-// ─── Detection: brightness-scan row-run ───────────────────────────────────────
-//
-// For each row (stride 6), find the widest contiguous run of pixels where
-// R > 185 AND G > 185 AND B > 185 (semi-transparent white over any background).
-// Group vertically adjacent matching rows whose horizontal extents overlap by
-// ≥ 40px. Validate bounding box dimensions and aspect ratio.
-// Score 0-100: density component (row count) + aspect component.
-
-function detectWatermark(imageData) {
-  const { data, width, height } = imageData;
-
-  // Per-row: find widest qualifying bright run
-  const rowRuns = [];
-  for (let y = 0; y < height; y += DETECT_STRIDE) {
-    let rs = -1, rw = 0, bestW = 0, bestX = -1;
-    for (let x = 0; x < width; x += DETECT_STRIDE) {
-      const i = (y * width + x) * 4;
-      if (data[i] > DETECT_THRESH && data[i+1] > DETECT_THRESH && data[i+2] > DETECT_THRESH) {
-        if (rs < 0) rs = x;
-        rw += DETECT_STRIDE;
-      } else {
-        if (rw > bestW) { bestW = rw; bestX = rs; }
-        rs = -1; rw = 0;
-      }
-    }
-    if (rw > bestW) { bestW = rw; bestX = rs; }
-    rowRuns.push(
-      bestW >= DETECT_MIN_W && bestW <= DETECT_MAX_W && bestX >= 0
-        ? { y, x: bestX, w: bestW }
-        : null
-    );
-  }
-
-  // Group vertically contiguous rows (allow 1 gap row)
-  let best = null;
-  for (let i = 0; i < rowRuns.length; i++) {
-    if (!rowRuns[i]) continue;
-
-    const group = [rowRuns[i]];
-    let gMinX = rowRuns[i].x;
-    let gMaxX = rowRuns[i].x + rowRuns[i].w;
-    let gaps  = 0;
-
-    for (let j = i + 1; j < rowRuns.length; j++) {
-      if (!rowRuns[j]) {
-        if (++gaps > 1) break;
-        continue;
-      }
-      const row     = rowRuns[j];
-      const overlap = Math.min(row.x + row.w, gMaxX) - Math.max(row.x, gMinX);
-      if (overlap < 40) break;
-      group.push(row);
-      if (row.x         < gMinX) gMinX = row.x;
-      if (row.x + row.w > gMaxX) gMaxX = row.x + row.w;
-    }
-
-    if (group.length < 2) continue;
-
-    const bw   = gMaxX - gMinX;
-    const minY = group[0].y;
-    const maxY = group[group.length - 1].y + DETECT_STRIDE;
-    const bh   = maxY - minY;
-    if (bh > DETECT_MAX_H)                  continue;
-    if (bw / Math.max(bh, 1) < DETECT_MIN_ASPECT) continue;
-
-    // Score 0-100: aspect quality (0-50) + row density (0-50)
-    const aspect      = bw / Math.max(bh, 1);
-    const aspectScore = Math.max(0, 50 - Math.abs(aspect - 4.0) * 6);
-    const densityScore = Math.min(50, group.length * 10);
-    const score = Math.round(aspectScore + densityScore);
-
-    if (!best || score > best.score) {
-      best = { x: gMinX, y: minY, w: bw, h: bh, score };
-    }
-  }
-
-  return best;
-}
-
-// ─── Temporal tracking ───────────────────────────────────────────────────────
-//
-// Requires CONFIRM_FRAMES consecutive detections within CONFIRM_DIST px before
-// logging. Logs a new entry only when centroid moves > LOG_MIN_DIST px from the
-// last logged position. Clears after MISS_TOLERANCE consecutive misses.
-
-function detectAndTrack(imageData) {
-  const candidate = detectWatermark(imageData);
-
-  if (!candidate) {
-    _missCount++;
-    if (_missCount >= MISS_TOLERANCE) {
-      _confirmedBox   = null;
-      _candidateBox   = null;
-      _candidateCount = 0;
-    }
-    return;
-  }
-
-  _missCount = 0;
-
-  if (_candidateBox && centroidDist(_candidateBox, candidate) <= CONFIRM_DIST) {
-    _candidateCount++;
-    _candidateBox = candidate;
-
-    if (_candidateCount >= CONFIRM_FRAMES) {
-      const isNewPosition = !_confirmedBox ||
-        centroidDist(_confirmedBox, candidate) > LOG_MIN_DIST;
-
-      _confirmedBox = { ...candidate };
-
-      if (isNewPosition) {
-        logPosition(candidate);
-      }
-    }
-  } else {
-    _candidateBox   = candidate;
-    _candidateCount = 1;
-  }
-}
-
-function centroidDist(a, b) {
-  const ax = a.x + a.w * 0.5, ay = a.y + a.h * 0.5;
-  const bx = b.x + b.w * 0.5, by = b.y + b.h * 0.5;
-  return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
-}
-
-// ─── Position logging ─────────────────────────────────────────────────────────
-
-function logPosition(box) {
-  const entry = {
-    x:       box.x,
-    y:       box.y,
-    w:       box.w,
-    h:       box.h,
-    score:   box.score,
-    frame:   _frameCount,
-    session: _sessionId,
-    ts:      Date.now(),
-  };
-
-  console.log(
-    `[POSITION] (${box.x},${box.y},${box.w}×${box.h})` +
-    ` score=${box.score} frame=${_frameCount} session=${_sessionId}`
-  );
-
-  _sessionPositions.push(entry);
-
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const existing = JSON.parse(
-        localStorage.getItem('loqii_watermark_positions') || '[]'
-      );
-      existing.push(entry);
-      localStorage.setItem('loqii_watermark_positions', JSON.stringify(existing));
-    } catch (err) {
-      console.warn('[HUNTER] localStorage write failed:', err.message);
-    }
-  }
-}
-
-// ─── Adaptive inpainting (active when DATA_COLLECTION_MODE = false) ───────────
+// ─── Adaptive inpainting ──────────────────────────────────────────────────────
 // 4-border bilinear blend + 2-pixel edge feather.
 
 function inpaintBox(box) {
@@ -455,35 +263,26 @@ function inpaintBox(box) {
 }
 
 // ─── Debug overlay ────────────────────────────────────────────────────────────
-//
 // window._loqiiWatermarkDebug = true
-// Yellow box = candidate, Red box = confirmed
-// HUD shows mode, position count, score, avgMs
+// Semi-transparent blue rectangles over all zones + stats HUD.
 
 function drawDebugOverlay() {
   _ctx.save();
 
-  if (_candidateBox) {
-    _ctx.strokeStyle = 'rgba(255,255,0,0.7)';
-    _ctx.lineWidth   = 1;
-    _ctx.strokeRect(_candidateBox.x, _candidateBox.y, _candidateBox.w, _candidateBox.h);
-  }
-  if (_confirmedBox) {
-    _ctx.strokeStyle = 'rgba(255,0,0,0.9)';
-    _ctx.lineWidth   = 2;
-    _ctx.strokeRect(_confirmedBox.x, _confirmedBox.y, _confirmedBox.w, _confirmedBox.h);
+  _ctx.strokeStyle = 'rgba(0,150,255,0.7)';
+  _ctx.fillStyle   = 'rgba(0,100,200,0.15)';
+  _ctx.lineWidth   = 1;
+  for (const zone of WATERMARK_ZONES) {
+    _ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+    _ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
   }
 
-  const mode = DATA_COLLECTION_MODE ? 'COLLECT' : 'INPAINT';
-  const cx   = _confirmedBox
-    ? `(${_confirmedBox.x},${_confirmedBox.y} ${_confirmedBox.w}×${_confirmedBox.h})`
-    : 'none';
   _ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  _ctx.fillRect(4, 4, 500, 22);
-  _ctx.fillStyle = DATA_COLLECTION_MODE ? '#ffee00' : '#00ff88';
+  _ctx.fillRect(4, 4, 340, 22);
+  _ctx.fillStyle = '#00aaff';
   _ctx.font      = '12px monospace';
   _ctx.fillText(
-    `HUNTER[${mode}]: ${cx}  n=${_sessionPositions.length}  avgMs=${_avgFrameTime.toFixed(1)}`,
+    `HUNTER: zones=${WATERMARK_ZONES.length}  avgMs=${_avgFrameTime.toFixed(1)}`,
     8, 19
   );
 
