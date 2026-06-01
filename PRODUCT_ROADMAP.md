@@ -109,6 +109,12 @@ Beta QA checklist:
 - Team/dev account mode for agencies and production studios.
 - Premium scene/style packs once the local preset system is stable.
 
+## Payment Readiness
+
+- Production payment checkout is scaffolded but disabled until the Tzurah backend reports a configured provider, live mode, checkout enabled, and credit pack purchase enabled.
+- Loqii Add Credits must show a disabled, readable state instead of starting checkout when provider status is `none`.
+- Mock payments remain dev/test only and must not become the production purchase path.
+
 ## Creator Workflow Ideas
 
 - Quick mode recipes: VTuber, TikTok beauty, podcast host, product demo, avatar guest.

@@ -2156,6 +2156,9 @@ const APP_OWNED_PROXY_PATHS = [
   "/api/app-config",
   "/api/config",
   "/api/credit-packs",
+  "/api/payments/config",
+  "/api/payments/checkout",
+  "/api/payments/status",
   "/api/feature-flags",
 ];
 
@@ -2251,6 +2254,11 @@ const APP_FLAG_DEFAULTS = {
   enable_new_modals: true,
   enable_advanced_diagnostics: false,
   enable_help_center: true,
+  enable_payments: false,
+  enable_payment_checkout: false,
+  enable_payment_webhooks: false,
+  enable_payment_admin_tools: false,
+  enable_credit_pack_purchase: false,
   enable_mock_payments: false,
   enable_real_payments: false,
   enable_topup_flow: true,
@@ -3961,6 +3969,88 @@ function buildCreditPackCards(packs) {
   }).join("");
 }
 
+async function loadPaymentConfigForTopup() {
+  try {
+    const res = await appApi("/api/payments/config", { timeoutMs: 5000 });
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok && data?.ok !== false,
+      configured: data?.configured === true,
+      liveMode: data?.live_mode === true,
+      provider: data?.provider || data?.active_provider || "none",
+      checkoutEnabled: data?.checkout_enabled === true,
+      raw: data,
+    };
+  } catch (err) {
+    console.warn("[PAYMENTS] Config unavailable:", err?.message || err);
+    return {
+      ok: false,
+      configured: false,
+      liveMode: false,
+      provider: "none",
+      checkoutEnabled: false,
+      raw: { code: "payment_config_unavailable" },
+    };
+  }
+}
+
+function isRealPaymentCheckoutEnabled(paymentConfig) {
+  return paymentConfig?.configured === true
+    && paymentConfig?.liveMode === true
+    && paymentConfig?.provider !== "none"
+    && paymentConfig?.checkoutEnabled === true
+    && isFeatureEnabled("enable_payments", false)
+    && isFeatureEnabled("enable_payment_checkout", false)
+    && isFeatureEnabled("enable_credit_pack_purchase", false)
+    && isFeatureEnabled("enable_real_payments", false);
+}
+
+function showPaymentsUnavailableModal(balanceText, balanceTime) {
+  LoqiiModal({
+    title: "Add Credits",
+    body: `
+      <div class="loqii-credit-modal">
+        <section class="loqii-credit-balance">
+          <div>
+            <div class="loqii-credit-label">Credits Remaining</div>
+            <div class="loqii-credit-value">${balanceText}</div>
+            <div class="loqii-credit-time">${balanceTime}</div>
+          </div>
+        </section>
+        <div class="loqii-credit-warning">Payments are not available yet. Credit purchase checkout is disabled while production payment readiness is completed.</div>
+        <div class="loqii-credit-actions">
+          <button class="loqii-btn loqii-btn-primary" type="button" data-payment-unavailable-close>Close</button>
+        </div>
+      </div>`,
+    cancelable: true,
+    showFooter: false,
+    width: 560,
+    className: "loqii-credit-shell",
+  });
+  const overlays = document.querySelectorAll(".loqii-overlay");
+  const ov = overlays[overlays.length - 1];
+  ov?.querySelector("[data-payment-unavailable-close]")?.addEventListener("click", () => {
+    ov.querySelector("[data-loqii-cancel]")?.click();
+  });
+}
+
+async function startPaymentCheckout(packId) {
+  const res = await appApi("/api/payments/checkout", {
+    method: "POST",
+    auth: true,
+    timeoutMs: 8000,
+    json: { pack_id: packId },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) {
+    return { error: data?.message || data?.error || "Payments are not available yet." };
+  }
+  if (data?.url) {
+    window.open(data.url, "_blank", "noopener,noreferrer");
+  }
+  return data;
+}
+
 async function openAddCreditsModal() {
   if (!isElectron) return;
   if (!isFeatureEnabled("enable_topup_flow", true)) {
@@ -3969,10 +4059,15 @@ async function openAddCreditsModal() {
   }
   document.querySelectorAll(".loqii-credit-shell").forEach((el) => el.closest(".loqii-overlay")?.remove());
   const mockMode = isMockPaymentsEnabled();
-  const packs = await loadCreditPacksForModal();
-  let selectedPack = null;
   const balanceText = escapeHtml(hdrCreditsVal?.textContent || "--");
   const balanceTime = escapeHtml((hdrCreditsTime?.textContent || "").replace(/[()]/g, ""));
+  const paymentConfig = mockMode ? null : await loadPaymentConfigForTopup();
+  if (!mockMode && !isRealPaymentCheckoutEnabled(paymentConfig)) {
+    showPaymentsUnavailableModal(balanceText, balanceTime);
+    return;
+  }
+  const packs = await loadCreditPacksForModal();
+  let selectedPack = null;
 
   LoqiiModal({
     title: "Add Credits",
@@ -4044,7 +4139,7 @@ async function openAddCreditsModal() {
 
     const result = mockMode
       ? await window.tzurah.mockPurchase(selectedPack.id)
-      : await window.tzurah.checkout(selectedPack.id);
+      : await startPaymentCheckout(selectedPack.id);
 
     if (result?.error) {
       msgEl.className = "loqii-credit-message error";
@@ -4072,7 +4167,7 @@ async function openAddCreditsModal() {
     }
 
     msgEl.className = "loqii-credit-message success";
-    msgEl.textContent = "Stripe Checkout opened in your browser.";
+    msgEl.textContent = "Payment checkout opened in your browser.";
     const minutes = formatPackMinutes(selectedPack.credits);
     continueBtn.textContent = `Continue to Payment - ${formatPrice(selectedPack.price_usd)} (${minutes} min)`;
     continueBtn.disabled = false;

@@ -437,3 +437,25 @@ Project docs:
 - `COMPONENTS.md`
 
 If docs are added to deploy sync, whitelist only docs explicitly and keep local-only app files blocked.
+
+## Add Credits Payment Readiness
+
+Location:
+- `index.html`
+- `server.mjs`
+
+Responsibility:
+- Show Add Credits only when `enable_topup_flow` allows the surface.
+- Keep mock purchases dev/test only through resolved feature flags.
+- For real purchases, ask the local proxy for `/api/payments/config` before showing checkout.
+- If payments are not configured, show a themed LoqiiModal message and do not call checkout.
+- Route future checkout/status calls through the local Electron proxy, not directly to the backend.
+
+Current state:
+- real provider checkout disabled
+- backend provider expected to be `none`
+- `configured=false`
+- `live_mode=false`
+
+Invariant:
+- Loqii never owns provider secrets and never grants credits from purchase events.

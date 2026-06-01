@@ -144,6 +144,11 @@ const SAFE_DEV_FEATURE_FLAGS = Object.freeze({
   enable_obs_tools: true,
   enable_beta_updater: false,
   enable_topup_flow: true,
+  enable_payments: false,
+  enable_payment_checkout: false,
+  enable_payment_webhooks: false,
+  enable_payment_admin_tools: false,
+  enable_credit_pack_purchase: false,
   enable_real_payments: false,
   enable_mock_payments: false,
   mock_payments: false,
@@ -800,6 +805,19 @@ function buildApp() {
 
   app.get("/api/credit-packs", (req, res) => {
     return proxyBackendJson(req, res, "/api/credit-packs", { timeoutMs: 5000 });
+  });
+
+  app.get("/api/payments/config", (req, res) => {
+    return proxyBackendJson(req, res, "/api/payments/config", { timeoutMs: 5000 });
+  });
+
+  app.post("/api/payments/checkout", (req, res) => {
+    return proxyBackendJson(req, res, "/api/payments/checkout", { timeoutMs: 8000 });
+  });
+
+  app.get("/api/payments/status/:purchase_id", (req, res) => {
+    const purchaseId = encodeURIComponent(req.params.purchase_id || "");
+    return proxyBackendJson(req, res, `/api/payments/status/${purchaseId}`, { timeoutMs: 5000 });
   });
 
   app.get("/api/feature-flags", (req, res) => {

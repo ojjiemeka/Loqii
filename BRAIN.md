@@ -26,3 +26,4 @@ Short, high-signal lessons only. Add durable rules, not session notes.
 - Loqii reads feature flags as resolved server truth; local fallbacks are user-safe and development-only.
 - Specialized overlays must use LoqiiModal/LoqiiDrawer/LoqiiToast, not one-off fixed modal shells.
 - Beta readiness is proven with `BETA_QA_CHECKLIST.md`, not memory or ad hoc manual notes.
+- Real payments are backend-owned and disabled until Tzurah reports provider configured, live mode, checkout, and purchase flags all true.

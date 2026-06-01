@@ -45,6 +45,9 @@ Use this checklist before any beta packaging or external tester handoff. Mark ea
 | Local proxy | `/api/ensure-profile` uses localhost proxy |  |  |
 | Local proxy | `/api/announcements` uses localhost proxy |  |  |
 | Local proxy | `/session/end` uses localhost proxy |  |  |
+| Local proxy | `/api/payments/config` uses localhost proxy |  |  |
+| Payments | Real Add Credits checkout disabled when provider is none |  |  |
+| Payments | Mock purchases remain dev/test only |  |  |
 | Local proxy | No renderer direct backend CORS errors |  |  |
 | Admin/backend | Admin login succeeds |  |  |
 | Admin/backend | Feature Flags page loads |  |  |
